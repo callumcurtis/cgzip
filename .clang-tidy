@@ -1,0 +1,14 @@
+Checks: "*,
+        -llvm*,
+        -fuchsia-*,
+        -altera-*,
+        -google-*,
+"
+WarningsAsErrors: "*"
+CheckOptions:
+    - key: readability-function-cognitive-complexity.Threshold
+      value: 30
+    - key: readability-identifier-length.IgnoredLoopCounterNames
+      value: "[a-z]"
+    - key: readability-identifier-length.IgnoredVariableNames
+      value: "[a-z]"

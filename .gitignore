@@ -1,0 +1,29 @@
+# cmake
+build/
+install/
+CMakeCache.txt
+CMakeFiles/
+
+# clangd
+.cache
+
+# direnv
+.direnv/
+
+# nix
+result
+
+# coverage
+coverage
+
+# scratch
+scratch/
+
+# vscode
+.vscode/
+
+# views of data
+data.tar
+data.tar.gz
+data.d.tar
+
