@@ -14,7 +14,7 @@ TEST_CASE("package merge") {
     auto lengths = package_merge<int, 17>(weights, 15);
     double kmi = 0;
     for (auto length : lengths) {
-      kmi += pow(2, -length);
+      kmi += pow(2, -(int) length);
     }
     REQUIRE_THAT(kmi, Catch::Matchers::WithinAbs(1.0, 1e-6));
   }

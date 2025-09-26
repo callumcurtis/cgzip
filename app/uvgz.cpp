@@ -11,15 +11,72 @@
 #include <array>
 #include <unordered_map>
 #include <string>
-#include <third_party/output_stream.hpp>
+#include "third_party/output_stream.hpp"
 
 // To compute CRC32 values, we can use this library
 // from https://github.com/d-bahr/CRCpp
 #define CRCPP_USE_CPP11
-#include <third_party/CRC.h>
+#include "third_party/CRC.h"
+#include "package_merge.hpp"
+#include "prefix_codes.hpp"
+
+#define NUM_LL_CODES 288
+#define EOB 256
+
+namespace {
+constexpr auto block_type_1_ll_code_lengths() -> std::array<length_t, NUM_LL_CODES> {
+  std::array<length_t, NUM_LL_CODES> lengths{};
+  std::fill(lengths.begin(),       lengths.begin() + 144, 8);
+  std::fill(lengths.begin() + 144, lengths.begin() + 256, 9);
+  std::fill(lengths.begin() + 256, lengths.begin() + 280, 7);
+  std::fill(lengths.begin() + 280, lengths.end(),         8);
+  return lengths;
+}
+
+constexpr auto block_type_1_prefix_codes() -> std::array<PrefixCode, NUM_LL_CODES> {
+  auto lengths = block_type_1_ll_code_lengths();
+  return prefix_codes<NUM_LL_CODES>(lengths);
+}
+}
+
+auto block_type_1(std::array< u8, (1<<16)-1 >& block_content, OutputBitStream& stream) -> void {
+  // LZSS with window size of 1 << 15, lookahead of 258, backreferences, (skip)
+
+  // Huffman coding
+  constexpr auto codes = block_type_1_prefix_codes();
+
+  // Convert backreferences into (length symbol, length offset, distance symbol, distance offset)
+  // Feed literal and length symbols through primary prefix code tree, offsets as-is
+  for (auto literal : block_content) {
+    const auto& code = codes.at(literal);
+    stream.push_symbol(code.bits, code.length);
+  }
+  // Add block marker (with coding)
+  const auto& eob_code = codes.at(EOB);
+  stream.push_symbol(eob_code.bits, eob_code.length);
+}
 
 
-
+// auto block_type_2(std::array< u8, (1<<16)-1 > block_content) -> void {
+//   // LZSS with window size of 1 << 15, lookahead of 258 (skip)
+//
+//   // For now, lets not do LVSS and just do huffman
+//   // We first get the counts of all literals
+//   // std::array<u8, NUM_LL_CODES> count_by_symbol{};
+//   // for (auto byte : block_content) {
+//   //   count_by_symbol.at(byte)++;
+//   // }
+//   // Next, set the count of the EOB marker to 1
+//   // count_by_symbol[EOB]++;
+//   // Now, we determine the lengths for each code
+//   // auto lengths = package_merge(count_by_symbol, )
+//
+//   // Add block marker
+//   // Backreferences
+//   // Convert backreferences into (length symbol, length offset, distance symbol, distance offset)
+//   // Feed literal and length symbols through primary prefix code tree
+//   // Push offsets (skipping 0)
+// }
 
 int main(){
 
@@ -80,9 +137,11 @@ int main(){
 
             //If we get to this point, we just added a byte to the block AND there is at least one more byte in the input waiting to be written.
             if (block_size == block_contents.size()){
+              stream.push_bit(0); //0 = not last block
+              if (false) {
+                // Block type 0
                 //The block is full, so write it out.
                 //We know that there are more bytes left, so this is not the last block
-                stream.push_bit(0); //0 = not last block
                 stream.push_bits(0, 2); //Two bit block type (in this case, block type 0)
                 stream.push_bits(0, 5); //Pad the stream to the next byte boundary.
                 //Now write the block size (as a pair (X, ~X) where X is the 16 bit size)
@@ -91,7 +150,13 @@ int main(){
                 //Now write the actual block data
                 for(unsigned int i = 0; i < block_size; i++)
                     stream.push_byte(block_contents.at(i)); //Interesting optimization question: Will the compiler optimize away the bounds checking for .at here?
-                block_size = 0;
+              } else {
+                // Block type 1
+                stream.push_bits(1, 2); // Two bit block type (in this case, block type 1)
+                // Now do the block type 1 handling
+                block_type_1(block_contents, stream);
+              }
+              block_size = 0;
             }
         }
     }
@@ -100,7 +165,7 @@ int main(){
         //Write out any leftover data
         stream.push_bit(1); //1 = last block
         stream.push_bits(0, 2); //Two bit block type (in this case, block type 0)
-        stream.push_bits(0, 5); //Pad the stream to the next byte boundary.
+        stream.flush_to_byte(); //Pad the stream to the next byte boundary
         //Now write the block size (as a pair (X, ~X) where X is the 16 bit size)
         stream.push_u16(block_size);
         stream.push_u16(~block_size);
@@ -116,3 +181,4 @@ int main(){
 
     return 0;
 }
+

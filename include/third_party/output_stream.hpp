@@ -4,16 +4,17 @@
    Definition of a bitstream class which complies with the bit ordering
    required by the gzip format.
 
-   (The member function definitions are all inline in this header file 
+   (The member function definitions are all inline in this header file
     for convenience, even though the use of such long inlined functions
     might be frowned upon under some style manuals)
 
    B. Bird - 2023-05-12
-*/ 
+*/
 
 #ifndef OUTPUT_STREAM_HPP
 #define OUTPUT_STREAM_HPP
 
+#include <bitset>
 #include <iostream>
 #include <cstdint>
 
@@ -44,7 +45,7 @@ public:
 
 
     /* These definitions allow for a notational convenience when pushing multiple bytes at a time
-       You can write things like stream.push_bytes(0x01, 0x02, 0x03) for any number of bytes, 
+       You can write things like stream.push_bytes(0x01, 0x02, 0x03) for any number of bytes,
        which will be pushed one at a time using the push_byte function above.*/
     void push_bytes(){
         //Base case
@@ -73,12 +74,26 @@ public:
     }
 
     /* Push a single bit b (stored as the LSB of an unsigned int)
-       into the stream */ 
+       into the stream */
     void push_bit(unsigned int b){
         bitvec |= (b&1)<<numbits;
         numbits++;
         if (numbits == 8)
             output_byte();
+    }
+
+    void push_symbol(unsigned int b, unsigned int num_bits) {
+        // if (num_bits == 9) {
+        //     std::cerr << "push_symbol(" << std::bitset<9>(b) << ", " << num_bits << "): ";
+        // }
+        for (unsigned int i = num_bits; i-- > 0;) {
+            // if (num_bits == 9) {
+            //     std::cerr << "(" << i << ", " << ((b>>i)&1) << ") ";
+            // }
+            push_bit((b>>i)&1); // TODO: fails with symbol length != 8
+        }
+        // if (num_bits == 9)
+        //   std::cerr << "\n";
     }
 
     /* Flush the currently stored bits to the output stream */
@@ -100,4 +115,4 @@ private:
 };
 
 
-#endif 
+#endif

@@ -23,7 +23,11 @@ scratch/
 .vscode/
 
 # views of data
+book1.gz
 data.tar
 data.tar.gz
 data.d.tar
+data.tar.1.gz
+data.tar.5.gz
+data.tar.9.gz
 

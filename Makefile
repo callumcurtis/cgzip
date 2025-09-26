@@ -1,16 +1,17 @@
 # Paths that require cleaning
-install-dir = $(shell pwd)/install/gzip
-build-dir = $(shell pwd)/build/gzip
-# coverage-dir = $(shell pwd)/coverage/gzip
+install-dir = $(shell pwd)/install
+build-dir = $(shell pwd)/build
+# coverage-dir = $(shell pwd)/coverage
 
 data.tar:
 	tar -cf data.tar data
 
 .PHONY: test
 test: install data.tar
-# cmake -S . -B $(build-dir)
-# cmake --build $(build-dir) --target test
-# $(build-dir)/test/test
+	cmake -S . -B $(build-dir)
+	cmake --build $(build-dir) --target test
+	$(build-dir)/test/test
+	$(install-dir)/bin/gzip < data/calgary_corpus/book1 > book1.gz
 	$(install-dir)/bin/gzip < data.tar > data.tar.gz
 	gzip -cd data.tar.gz > data.d.tar
 	diff data.d.tar data.tar
