@@ -83,17 +83,9 @@ public:
     }
 
     void push_symbol(unsigned int b, unsigned int num_bits) {
-        // if (num_bits == 9) {
-        //     std::cerr << "push_symbol(" << std::bitset<9>(b) << ", " << num_bits << "): ";
-        // }
         for (unsigned int i = num_bits; i-- > 0;) {
-            // if (num_bits == 9) {
-            //     std::cerr << "(" << i << ", " << ((b>>i)&1) << ") ";
-            // }
-            push_bit((b>>i)&1); // TODO: fails with symbol length != 8
+            push_bit((b>>i)&1);
         }
-        // if (num_bits == 9)
-        //   std::cerr << "\n";
     }
 
     /* Flush the currently stored bits to the output stream */

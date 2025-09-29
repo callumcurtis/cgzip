@@ -1,6 +1,5 @@
 #pragma once
 
-#include <span>
 #include <stdexcept>
 
 struct BackReference {
@@ -8,8 +7,8 @@ struct BackReference {
   std::size_t length;
 };
 
-template <typename T>
-auto lzss(std::span<T> lookback, std::span<T> lookahead) -> BackReference {
+template <typename LookBack, typename LookAhead>
+auto lzss(LookBack lookback, LookAhead lookahead) -> BackReference {
   if (lookahead.size() <= 0) {
     throw std::invalid_argument("The lookahead buffer must include at least one element, which corresponds to the next element to be encoded.");
   }

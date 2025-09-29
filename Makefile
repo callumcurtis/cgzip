@@ -16,6 +16,10 @@ test: install data.tar
 	gzip -cd data.tar.gz > data.d.tar
 	diff data.d.tar data.tar
 
+.PHONE: profile
+profile: install data.tar
+	$(install-dir)/bin/gzip < data.tar > data.tar.gz & pid=$$! && flamegraph $$pid > flamegraph.svg
+
 # .PHONY: generate-coverage
 # generate-coverage:
 # 	cmake -S . -B $(build-dir) -DENABLE_COVERAGE=ON

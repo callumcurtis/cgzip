@@ -4,6 +4,9 @@ install/
 CMakeCache.txt
 CMakeFiles/
 
+# profiling
+flamegraph.svg
+
 # clangd
 .cache
 
