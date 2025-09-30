@@ -129,27 +129,34 @@ private:
     out_.push_symbol(code.bits, code.length);
   }
 
-  auto push_back_reference(const BackReference& back_reference) {
-    const auto& length_encoding = length_encodings_.at(back_reference.length);
-    const auto& distance_encoding = distance_encodings_.at(back_reference.distance);
-    push_code(length_encoding.prefix_code);
-    out_.push_bits(length_encoding.offset, length_encoding.num_offset_bits);
-    push_code(distance_encoding.prefix_code);
-    out_.push_bits(distance_encoding.offset, distance_encoding.num_offset_bits);
+  auto push_back_reference(const PrefixCodeWithOffset& length, const PrefixCodeWithOffset& distance) {
+   push_code(length.prefix_code);
+   out_.push_bits(length.offset, length.num_offset_bits);
+   push_code(distance.prefix_code);
+   out_.push_bits(distance.offset, distance.num_offset_bits);
   }
 
   auto step() {
     const auto backref = lzss(look_back, look_ahead);
     const auto byte = look_ahead.dequeue();
     look_back.enqueue(byte);
+    const auto& code = codes_.at(byte);
     if (backref.length >= minimum_back_reference_length) {
-      push_back_reference(backref);
-      for (auto i = 1; i < backref.length; ++i) {
-        look_back.enqueue(look_ahead.dequeue());
+      const auto& length_encoding = length_encodings_.at(backref.length);
+      const auto& distance_encoding = distance_encodings_.at(backref.distance);
+      auto num_literal_bits = code.length;
+      for (auto i = 0; i < backref.length - 1; ++i) {
+        num_literal_bits += codes_.at(look_ahead[i]).length;
       }
-    } else {
-      push_code(codes_.at(byte));
+      if (num_literal_bits >= length_encoding.prefix_code.length + length_encoding.num_offset_bits + distance_encoding.prefix_code.length + distance_encoding.num_offset_bits) {
+        push_back_reference(length_encoding, distance_encoding);
+        for (auto i = 1; i < backref.length; ++i) {
+          look_back.enqueue(look_ahead.dequeue());
+        }
+        return;
+      }
     }
+    push_code(code);
   }
 };
 
