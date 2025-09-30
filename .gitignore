@@ -26,6 +26,7 @@ scratch/
 .vscode/
 
 # views of data
+paper1.gz
 book1.gz
 data.tar
 data.tar.gz

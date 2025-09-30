@@ -18,7 +18,7 @@ test: install data.tar
 
 .PHONE: profile
 profile: install data.tar
-	$(install-dir)/bin/gzip < data.tar > data.tar.gz & pid=$$! && flamegraph $$pid > flamegraph.svg
+	$(install-dir)/bin/gzip < data.tar > data.tar.gz & pid=$$! && flamegraph $$pid > flamegraph.svg && kill $$pid
 
 # .PHONY: generate-coverage
 # generate-coverage:
