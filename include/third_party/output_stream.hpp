@@ -18,6 +18,8 @@
 #include <iostream>
 #include <cstdint>
 
+#include "lzss.hpp"
+
 /* These definitions are more reliable for fixed width types than using "int" and assuming its width */
 using u8 = std::uint8_t;
 using u16 = std::uint16_t;
@@ -82,11 +84,22 @@ public:
             output_byte();
     }
 
-    void push_symbol(unsigned int b, unsigned int num_bits) {
-        for (unsigned int i = num_bits; i-- > 0;) {
-            push_bit((b>>i)&1);
+   auto push_prefix_code(const PrefixCode& code) {
+        for (unsigned int i = code.length; i-- > 0;) {
+            push_bit((code.bits>>i)&1);
         }
-    }
+   }
+
+   auto push_offset(const Offset& offset) {
+       push_bits(offset.bits, offset.num_bits);
+   }
+
+   auto push_back_reference(const PrefixCodeWithOffset& length, const PrefixCodeWithOffset& distance) {
+       push_prefix_code(length.prefix_code);
+       push_offset(length.offset);
+       push_prefix_code(distance.prefix_code);
+       push_offset(distance.offset);
+   }
 
     /* Flush the currently stored bits to the output stream */
     void flush_to_byte(){

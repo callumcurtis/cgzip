@@ -1,7 +1,8 @@
 #pragma once
 
-#include "package_merge.hpp"
 #include <cstdint>
+
+#include "package_merge.hpp"
 
 using code_bits_t = std::uint16_t;
 
