@@ -5,8 +5,8 @@
 
 #define NUM_LL_CODES 288
 
-constexpr auto block_type_1_ll_code_lengths() -> std::array<length_t, NUM_LL_CODES> {
-  std::array<length_t, NUM_LL_CODES> lengths{};
+constexpr auto block_type_1_ll_code_lengths() -> std::array<std::uint8_t, NUM_LL_CODES> {
+  std::array<std::uint8_t, NUM_LL_CODES> lengths{};
   std::fill(lengths.begin(),       lengths.begin() + 144, 8);
   std::fill(lengths.begin() + 144, lengths.begin() + 256, 9);
   std::fill(lengths.begin() + 256, lengths.begin() + 280, 7);

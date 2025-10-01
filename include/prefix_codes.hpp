@@ -1,18 +1,19 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
-
-#include "package_merge.hpp"
+#include <span>
+#include <vector>
 
 using code_bits_t = std::uint16_t;
 
 struct PrefixCode {
   code_bits_t bits;
-  length_t length;
+  std::uint8_t length;
 };
 
-template <lengths_size_t N>
-constexpr auto prefix_codes(std::span<length_t, N> lengths) -> std::array<PrefixCode, N> {
+template <std::size_t N>
+constexpr auto prefix_codes(std::span<const std::uint8_t, N> lengths) -> std::array<PrefixCode, N> {
   // Based on RFC 1951 (Section 3.2.2):
   // https://www.ietf.org/rfc/rfc1951.txt
   // Reference:
@@ -24,7 +25,7 @@ constexpr auto prefix_codes(std::span<length_t, N> lengths) -> std::array<Prefix
 
   // Step 1.
   auto max_length = *std::ranges::max_element(lengths);
-  std::vector<lengths_size_t> count_by_length(max_length+1);
+  std::vector<std::uint16_t> count_by_length(max_length+1);
   for (auto length : lengths) {
     count_by_length[length]++;
   }

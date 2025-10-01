@@ -28,16 +28,16 @@ private:
     return prefix_codes_with_offsets;
   }
 
-  static constexpr auto build_ll_prefix_codes() -> std::array<PrefixCode, num_ll_codes> {
-    std::array<length_t, num_ll_codes> lengths{};
+  static constexpr auto build_ll_prefix_codes() -> std::array<PrefixCode, num_ll_symbols> {
+    std::array<std::uint8_t, num_ll_symbols> lengths{};
     std::fill(lengths.begin(),       lengths.begin() + 144, 8);
     std::fill(lengths.begin() + 144, lengths.begin() + 256, 9);
     std::fill(lengths.begin() + 256, lengths.begin() + 280, 7);
     std::fill(lengths.begin() + 280, lengths.end(),         8);
-    return prefix_codes<num_ll_codes>(lengths);
+    return prefix_codes<num_ll_symbols>(lengths);
   }
 
-  static constexpr auto build_length_prefix_codes_with_offsets(const std::array<PrefixCode, num_ll_codes> codes) -> std::array<PrefixCodeWithOffset, maximum_look_ahead_size+1> {
+  static constexpr auto build_length_prefix_codes_with_offsets(const std::array<PrefixCode, num_ll_symbols> codes) -> std::array<PrefixCodeWithOffset, maximum_look_ahead_size+1> {
     std::array<PrefixCodeWithOffset, maximum_look_ahead_size+1> prefix_codes_with_offsets{};
     for (auto length = minimum_back_reference_length; length <= maximum_look_ahead_size; ++length) {
       const auto& symbol_with_offset = symbol_with_offset_from_length(length);
@@ -49,7 +49,7 @@ private:
     return prefix_codes_with_offsets;
   }
 
-  static constexpr std::array<PrefixCode, num_ll_codes> codes_{build_ll_prefix_codes()};
+  static constexpr std::array<PrefixCode, num_ll_symbols> codes_{build_ll_prefix_codes()};
   static constexpr std::array<PrefixCodeWithOffset, maximum_look_ahead_size+1> length_encodings_{build_length_prefix_codes_with_offsets(codes_)};
   static constexpr std::array<PrefixCodeWithOffset, maximum_look_back_size+1> distance_encodings_{build_distance_prefix_codes_with_offsets()};
 public:
