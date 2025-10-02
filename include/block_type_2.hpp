@@ -93,8 +93,12 @@ private:
       return count;
     };
 
-    const auto num_trailing_zero_length_literal_length_prefix_codes = count_trailing_zero_length_prefix_codes(literal_length_prefix_codes);
-    const auto num_trailing_zero_length_distance_prefix_codes = count_trailing_zero_length_prefix_codes(distance_prefix_codes);
+    auto count_leading_prefix_codes = [](const std::uint16_t min, const std::uint16_t max, const std::uint16_t trailing) {
+      return std::max(min, std::uint16_t(max - trailing));
+    };
+
+    const auto num_leading_literal_length_prefix_codes = count_leading_prefix_codes(257, num_ll_symbols, count_trailing_zero_length_prefix_codes(literal_length_prefix_codes));
+    const auto num_leading_distance_prefix_codes = count_leading_prefix_codes(1, num_distance_symbols, count_trailing_zero_length_prefix_codes(distance_prefix_codes));
 
     const std::uint8_t num_code_length_symbols = 19;
 
@@ -164,8 +168,8 @@ private:
       }
     };
 
-    add_prefix_codes_to_code_length_symbols(literal_length_prefix_codes.begin(), literal_length_prefix_codes.end() - num_trailing_zero_length_literal_length_prefix_codes);
-    add_prefix_codes_to_code_length_symbols(distance_prefix_codes.begin(), distance_prefix_codes.end() - num_trailing_zero_length_distance_prefix_codes);
+    add_prefix_codes_to_code_length_symbols(literal_length_prefix_codes.begin(), literal_length_prefix_codes.begin() + num_leading_literal_length_prefix_codes);
+    add_prefix_codes_to_code_length_symbols(distance_prefix_codes.begin(), distance_prefix_codes.begin() + num_leading_distance_prefix_codes);
     flush_prefix_code_sequence_to_code_length_symbols();
 
     const std::uint8_t maximum_code_length = 7;
@@ -192,14 +196,12 @@ private:
       code_length_prefix_codes[1],
       code_length_prefix_codes[15]
     };
-    const auto num_trailing_zero_length_code_length_prefix_codes = count_trailing_zero_length_prefix_codes(reordered_code_length_prefix_codes);
+    const auto num_leading_code_length_prefix_codes = count_leading_prefix_codes(4, num_code_length_symbols, count_trailing_zero_length_prefix_codes(reordered_code_length_prefix_codes));
 
-    out_.push_bits(num_ll_symbols - num_trailing_zero_length_literal_length_prefix_codes - 257, 5);
-    // TODO: make sure not negative
-    out_.push_bits(num_distance_symbols - num_trailing_zero_length_distance_prefix_codes - 1, 5);
-    out_.push_bits(num_code_length_symbols - num_trailing_zero_length_code_length_prefix_codes - 4, 4);
-    for (std::uint8_t i = 0; i < num_code_length_symbols - num_trailing_zero_length_code_length_prefix_codes; ++i) {
-      // TODO: make sure minimum of 4 is held
+    out_.push_bits(num_leading_literal_length_prefix_codes - 257, 5);
+    out_.push_bits(num_leading_distance_prefix_codes - 1, 5);
+    out_.push_bits(num_leading_code_length_prefix_codes - 4, 4);
+    for (std::uint8_t i = 0; i < num_leading_code_length_prefix_codes; ++i) {
       out_.push_bits(reordered_code_length_prefix_codes.at(i).length, 3);
     }
     for (const auto& symbol_or_symbol_with_offset : cl_symbols) {

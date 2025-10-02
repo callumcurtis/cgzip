@@ -21,6 +21,7 @@ template <std::size_t N, typename W = std::size_t>
 auto package_merge(std::span<W, N> weights, std::uint8_t max_length) -> std::array<std::uint8_t, N> {
   // https://people.eng.unimelb.edu.au/ammoffat/abstracts/compsurv19moffat.pdf
   static_assert(N <= std::numeric_limits<std::uint16_t>::max());
+  std::array<std::uint8_t, N> lengths{};
   std::vector<std::vector<Package<W>>> packages_by_level(max_length);
   for (std::uint16_t i = 0; i < weights.size(); ++i) {
     if (weights[i] == 0) {
@@ -29,6 +30,11 @@ auto package_merge(std::span<W, N> weights, std::uint8_t max_length) -> std::arr
     packages_by_level.at(0).push_back({weights[i], {i}});
   }
   const std::uint16_t num_non_zero_weights = packages_by_level.at(0).size();
+  if (num_non_zero_weights == 1) {
+    // TODO: length at least 1 is required for a single weight due to serialization in block type 2; explore alternatives
+    lengths.at(packages_by_level.at(0).at(0).indices.at(0))++;
+    return lengths;
+  }
   std::ranges::sort(packages_by_level.at(0), comparePackages<W>);
   for (std::uint8_t level = 1; level < max_length; ++level) {
     std::vector<Package<W>>& curr_packages = packages_by_level.at(level);
@@ -60,7 +66,6 @@ auto package_merge(std::span<W, N> weights, std::uint8_t max_length) -> std::arr
     };
     solution_by_level.at(level) = {packages_by_level.at(level).begin(), packages_by_level.at(level).begin() + (2 * num_multi_item_packages_in_prev_layer)};
   }
-  std::array<std::uint8_t, N> lengths{};
   for (std::uint8_t level = max_length; level-- > 0;) {
     for (const auto& package : solution_by_level.at(level)) {
       if (package.indices.size() > 1) {
