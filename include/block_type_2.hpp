@@ -19,7 +19,7 @@ private:
 public:
   explicit BlockType2Stream(OutputBitStream& output_bit_stream) : out_{output_bit_stream} {}
 
-  auto start() {
+  auto reset() {
     count_by_symbol.fill(0);
     block.clear();
   }
@@ -32,11 +32,7 @@ public:
     step();
   }
 
-  auto end() {
-    end(true);
-  }
-
-  auto end(bool is_last) {
+  auto commit(bool is_last) {
     out_.push_bit(is_last ? 1 : 0); // 1 = last block
     out_.push_bits(2, 2); // Two bit block type (in this case, block type 2)
 
@@ -48,11 +44,8 @@ public:
     push_symbol(eob);
 
     flush_block();
-  }
 
-  auto restart() {
-    end(false);
-    start();
+    reset();
   }
 
 private:

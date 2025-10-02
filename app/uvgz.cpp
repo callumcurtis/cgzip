@@ -40,7 +40,7 @@ int main(){
     //Keep a running CRC of the data we read.
     u32 crc {};
 
-    BlockType1Stream block_stream(stream);
+    BlockType2Stream block_stream(stream);
 
     if (std::cin.get(next_byte)){
         block_stream.reset();
