@@ -6,6 +6,7 @@
 #define CRCPP_USE_CPP11
 #include "third_party/CRC.h"
 
+#include "block_type_0.hpp"
 #include "block_type_1.hpp"
 #include "block_type_2.hpp"
 
@@ -38,27 +39,27 @@ int main(){
     //Keep a running CRC of the data we read.
     u32 crc {};
 
-    BlockType2Stream block_type_2_stream(stream);
+    BlockType0Stream block_type_0_stream(stream);
 
     if (std::cin.get(next_byte)){
-        block_type_2_stream.start();
+        block_type_0_stream.reset();
 
         bytes_read++;
         //Update the CRC as we read each byte (there are faster ways to do this)
         crc = CRC::Calculate(&next_byte, 1, crc_table); //This call creates the initial CRC value from the first byte read.
         //Read through the input
         while(1){
-            block_type_2_stream.put(next_byte);
+            block_type_0_stream.put(next_byte);
             if (!std::cin.get(next_byte))
                 break;
             bytes_read++;
             crc = CRC::Calculate(&next_byte,1, crc_table, crc); //Add the character we just read to the CRC (even though it is not in a block yet)
 
-            if (block_type_2_stream.block_size() >= 1 << 15) {
-                block_type_2_stream.restart();
+            if (block_type_0_stream.size() >= BlockType0Stream::capacity()) {
+                block_type_0_stream.commit(false);
             }
         }
-        block_type_2_stream.end();
+        block_type_0_stream.commit(true);
 
         // Pad to byte boundary before returning to gz
         stream.flush_to_byte();
