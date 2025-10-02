@@ -29,6 +29,7 @@ int main(){
 
     //Note that the types u8, u16 and u32 are defined in the output_stream.hpp header
     u32 bytes_read {0};
+    u32 block_size {0};
 
     char next_byte {}; //Note that we have to use a (signed) char here for compatibility with istream::get()
 
@@ -39,27 +40,30 @@ int main(){
     //Keep a running CRC of the data we read.
     u32 crc {};
 
-    BlockType0Stream block_type_0_stream(stream);
+    BlockType1Stream block_stream(stream);
 
     if (std::cin.get(next_byte)){
-        block_type_0_stream.reset();
+        block_stream.reset();
 
         bytes_read++;
+        block_size++;
         //Update the CRC as we read each byte (there are faster ways to do this)
         crc = CRC::Calculate(&next_byte, 1, crc_table); //This call creates the initial CRC value from the first byte read.
         //Read through the input
         while(1){
-            block_type_0_stream.put(next_byte);
+            block_stream.put(next_byte);
             if (!std::cin.get(next_byte))
                 break;
             bytes_read++;
+            block_size++;
             crc = CRC::Calculate(&next_byte,1, crc_table, crc); //Add the character we just read to the CRC (even though it is not in a block yet)
 
-            if (block_type_0_stream.size() >= BlockType0Stream::capacity()) {
-                block_type_0_stream.commit(false);
+            if (block_size >= BlockType0Stream::capacity()) {
+                block_stream.commit(false);
+                block_size = 0;
             }
         }
-        block_type_0_stream.commit(true);
+        block_stream.commit(true);
 
         // Pad to byte boundary before returning to gz
         stream.flush_to_byte();

@@ -32,10 +32,6 @@ public:
     step();
   }
 
-  [[nodiscard]] auto block_size() const -> std::size_t {
-    return block.size();
-  }
-
   auto end() {
     end(true);
   }
