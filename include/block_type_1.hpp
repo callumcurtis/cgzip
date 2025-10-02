@@ -9,6 +9,7 @@
 template <std::size_t LookBackSize = maximum_look_back_size, std::size_t LookAheadSize = maximum_look_ahead_size>
 class BlockType1Stream {
 private:
+  std::uint64_t bits_;
   OutputBitStream& out_;
   std::vector<std::variant<PrefixCode, Offset>> block;
   RingBuffer<std::uint8_t, LookBackSize> look_back{};
@@ -56,6 +57,10 @@ private:
 public:
   explicit BlockType1Stream(OutputBitStream& output_bit_stream) : out_{output_bit_stream} {}
 
+  [[nodiscard]] auto bits() const -> std::uint64_t {
+    return bits_;
+  }
+
   auto reset() {
     block.clear();
   }
@@ -88,10 +93,12 @@ public:
 private:
   auto push_prefix_code(const PrefixCode& prefix_code) {
     block.emplace_back(prefix_code);
+    bits_ += prefix_code.length;
   }
 
   auto push_offset(const Offset& offset) {
     block.emplace_back(offset);
+    bits_ += offset.num_bits;
   }
 
   auto push_back_reference(const PrefixCodeWithOffset& length, const PrefixCodeWithOffset& distance) {

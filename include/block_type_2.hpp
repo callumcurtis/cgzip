@@ -10,18 +10,24 @@
 template <std::size_t LookBackSize = maximum_look_back_size, std::size_t LookAheadSize = maximum_look_ahead_size>
 class BlockType2Stream {
 private:
-  OutputBitStream& out_;
+  BufferedOutputBitStream out_;
   std::array<std::size_t, num_ll_symbols + num_distance_symbols> count_by_symbol{};
   std::vector<std::variant<Symbol, Offset>> block;
   RingBuffer<std::uint8_t, LookBackSize> look_back{};
   RingBuffer<std::uint8_t, LookAheadSize> look_ahead{};
 
 public:
-  explicit BlockType2Stream(OutputBitStream& output_bit_stream) : out_{output_bit_stream} {}
+  explicit BlockType2Stream(OutputBitStream& output_bit_stream) : out_{BufferedOutputBitStream(output_bit_stream)} {}
+
+  [[nodiscard]] auto bits() -> std::size_t {
+    buffer_all_except_last_block_flag();
+    return out_.bits() + 1;
+  }
 
   auto reset() {
     count_by_symbol.fill(0);
     block.clear();
+    out_.reset();
   }
 
   auto put(std::uint8_t byte) {
@@ -33,7 +39,20 @@ public:
   }
 
   auto commit(bool is_last) {
-    out_.push_bit(is_last ? 1 : 0); // 1 = last block
+    buffer_all_except_last_block_flag();
+    out_.unbuffered().push_bit(is_last ? 1 : 0);
+    out_.commit();
+    reset();
+  }
+
+private:
+
+  auto buffer_all_except_last_block_flag() {
+    if (out_.bits() > 0) {
+      // We have already buffered
+      return;
+    }
+
     out_.push_bits(2, 2); // Two bit block type (in this case, block type 2)
 
     // TODO: allow look-ahead into next block
@@ -44,11 +63,8 @@ public:
     push_symbol(eob);
 
     flush_block();
-
-    reset();
   }
 
-private:
   auto push_symbol(const Symbol symbol) {
     count_by_symbol.at(symbol)++;
     block.emplace_back(symbol);

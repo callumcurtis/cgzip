@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 
 #include "third_party/output_stream.hpp"
@@ -6,6 +7,7 @@
 #define CRCPP_USE_CPP11
 #include "third_party/CRC.h"
 
+#include "change_point_detection.hpp"
 #include "block_type_0.hpp"
 #include "block_type_1.hpp"
 #include "block_type_2.hpp"
@@ -40,10 +42,33 @@ int main(){
     //Keep a running CRC of the data we read.
     u32 crc {};
 
-    BlockType2Stream block_stream(stream);
+    BlockType0Stream block_type_0_stream(stream);
+    BlockType1Stream block_type_1_stream(stream);
+    BlockType2Stream block_type_2_stream(stream);
+    CusumDistributionDetector change_point_detector(1 << 10, 1e4);
+
+    auto commit_smallest = [&block_type_0_stream, &block_type_1_stream, &block_type_2_stream](bool is_last) {
+        const std::array<std::uint64_t, 3> bits_by_block_type{block_type_0_stream.bits(), block_type_1_stream.bits(), block_type_2_stream.bits()};
+        const auto smallest = std::distance(bits_by_block_type.begin(), std::ranges::min_element(bits_by_block_type));
+        switch (smallest) {
+          case 0:
+            block_type_0_stream.commit(is_last);
+            break;
+          case 1:
+            block_type_1_stream.commit(is_last);
+            break;
+          case 2:
+            block_type_2_stream.commit(is_last);
+            break;
+          default:
+            throw std::logic_error("Unrecognized block type corresponding to smallest number of bits");
+        }
+    };
 
     if (std::cin.get(next_byte)){
-        block_stream.reset();
+        block_type_0_stream.reset();
+        block_type_1_stream.reset();
+        block_type_2_stream.reset();
 
         bytes_read++;
         block_size++;
@@ -51,19 +76,27 @@ int main(){
         crc = CRC::Calculate(&next_byte, 1, crc_table); //This call creates the initial CRC value from the first byte read.
         //Read through the input
         while(1){
-            block_stream.put(next_byte);
+            block_type_0_stream.put(next_byte);
+            block_type_1_stream.put(next_byte);
+            block_type_2_stream.put(next_byte);
+            const auto is_change_point_detected = change_point_detector.step((double(next_byte) - 128) / 128).second;
             if (!std::cin.get(next_byte))
                 break;
             bytes_read++;
             block_size++;
             crc = CRC::Calculate(&next_byte,1, crc_table, crc); //Add the character we just read to the CRC (even though it is not in a block yet)
 
-            if (block_size >= BlockType0Stream::capacity()) {
-                block_stream.commit(false);
+            if (block_size >= BlockType0Stream::capacity() || is_change_point_detected) {
+                commit_smallest(false);
+                block_type_0_stream.reset();
+                block_type_1_stream.reset();
+                block_type_2_stream.reset();
+                change_point_detector.reset();
                 block_size = 0;
             }
         }
-        block_stream.commit(true);
+
+        commit_smallest(true);
 
         // Pad to byte boundary before returning to gz
         stream.flush_to_byte();

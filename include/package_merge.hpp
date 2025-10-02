@@ -30,6 +30,9 @@ auto package_merge(std::span<W, N> weights, std::uint8_t max_length) -> std::arr
     packages_by_level.at(0).push_back({weights[i], {i}});
   }
   const std::uint16_t num_non_zero_weights = packages_by_level.at(0).size();
+  if (num_non_zero_weights == 0) {
+    return lengths;
+  }
   if (num_non_zero_weights == 1) {
     // TODO: length at least 1 is required for a single weight due to serialization in block type 2; explore alternatives
     lengths.at(packages_by_level.at(0).at(0).indices.at(0))++;

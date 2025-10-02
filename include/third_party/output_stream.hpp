@@ -119,5 +119,103 @@ private:
     std::ostream& outfile;
 };
 
+class BufferedOutputBitStream {
+public:
+    BufferedOutputBitStream(OutputBitStream& target_stream)
+        : target_stream(target_stream), numbits(0), current_byte(0), bits_in_current_byte(0) {}
+
+    void push_bit(unsigned int b) {
+        u8 bit = (b & 1);
+
+        current_byte |= bit << bits_in_current_byte;
+        bits_in_current_byte++;
+        numbits++;
+
+        if (bits_in_current_byte == 8) {
+            buffer.push_back(current_byte);
+            current_byte = 0;
+            bits_in_current_byte = 0;
+        }
+    }
+
+    void push_bits(unsigned int b, unsigned int num_bits) {
+        if (num_bits > 32) throw std::out_of_range("num_bits cannot exceed 32");
+
+        for (unsigned int i = 0; i < num_bits; i++) {
+            push_bit((b >> i) & 1);
+        }
+    }
+
+    void push_byte(unsigned char b) {
+        push_bits(b, 8);
+    }
+
+    void push_u32(u32 i) {
+        push_bits(i, 32);
+    }
+
+    void push_u16(u16 i) {
+        push_bits(i, 16);
+    }
+
+    void push_bytes() {
+    }
+    template<typename T, typename ...Ts>
+    void push_bytes(T v1, Ts... rest) {
+        push_byte(v1);
+        push_bytes(rest...);
+    }
+
+    auto push_prefix_code(const PrefixCode& code) {
+        for (unsigned int i = code.length; i-- > 0;) {
+            push_bit((code.bits >> i) & 1);
+        }
+    }
+
+    auto push_offset(const Offset& offset) {
+        push_bits(offset.bits, offset.num_bits);
+    }
+
+    auto push_back_reference(const PrefixCodeWithOffset& length, const PrefixCodeWithOffset& distance) {
+        push_prefix_code(length.prefix_code);
+        push_offset(length.offset);
+        push_prefix_code(distance.prefix_code);
+        push_offset(distance.offset);
+    }
+
+    void commit() {
+        for (const auto& byte : buffer) {
+            target_stream.push_byte(byte);
+        }
+
+        if (bits_in_current_byte > 0) {
+            target_stream.push_bits(current_byte, bits_in_current_byte);
+        }
+
+        reset();
+    }
+
+    void reset() {
+        buffer.clear();
+        numbits = 0;
+        current_byte = 0;
+        bits_in_current_byte = 0;
+    }
+
+    u32 bits() const {
+        return numbits;
+    }
+
+    [[nodiscard]] auto unbuffered() -> OutputBitStream& {
+      return target_stream;
+    }
+
+private:
+    OutputBitStream& target_stream;
+    std::vector<u8> buffer; // Stores completed bytes
+    u32 numbits;            // Total bits buffered
+    u8 current_byte;       // The byte currently being built (partial byte)
+    u32 bits_in_current_byte; // Number of valid bits in current_byte (0-7)
+};
 
 #endif

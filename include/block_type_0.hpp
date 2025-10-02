@@ -13,6 +13,10 @@ public:
     block_.reserve(capacity_);
   }
 
+  [[nodiscard]] auto bits() const -> std::uint64_t {
+    return 40 + (block_.size() * 8);
+  }
+
   auto reset() {
     block_.clear();
   }
@@ -34,10 +38,6 @@ public:
       out_.push_byte(literal);
     }
     reset();
-  }
-
-  [[nodiscard]] auto size() const -> std::size_t {
-    return block_.size();
   }
 
   [[nodiscard]] static auto capacity() -> std::size_t {
