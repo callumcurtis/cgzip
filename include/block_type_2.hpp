@@ -4,17 +4,15 @@
 
 #include "package_merge.hpp"
 #include "lzss.hpp"
-#include "ring_buffer.hpp"
 #include "types.hpp"
 
 template <std::size_t LookBackSize = maximum_look_back_size, std::size_t LookAheadSize = maximum_look_ahead_size>
 class BlockType2Stream {
 private:
   BufferedOutputBitStream out_;
+  Lzss<LookBackSize, LookAheadSize> lzss_;
   std::array<std::size_t, num_ll_symbols + num_distance_symbols> count_by_symbol{};
   std::vector<std::variant<Symbol, Offset>> block;
-  RingBuffer<std::uint8_t, LookBackSize> look_back{};
-  RingBuffer<std::uint8_t, LookAheadSize> look_ahead{};
 
 public:
   explicit BlockType2Stream(OutputBitStream& output_bit_stream) : out_{BufferedOutputBitStream(output_bit_stream)} {}
@@ -31,10 +29,7 @@ public:
   }
 
   auto put(std::uint8_t byte) {
-    look_ahead.enqueue(byte);
-    if (!look_ahead.is_full()) {
-      return;
-    }
+    lzss_.step(byte);
     step();
   }
 
@@ -56,7 +51,8 @@ private:
     out_.push_bits(2, 2); // Two bit block type (in this case, block type 2)
 
     // TODO: allow look-ahead into next block
-    while (!look_ahead.is_empty()) {
+    while (!lzss_.is_empty()) {
+      lzss_.step();
       step();
     }
 
@@ -254,18 +250,16 @@ private:
   }
 
   auto step() {
-    const auto backref = lzss(look_back, look_ahead);
-    const auto byte = look_ahead.dequeue();
-    look_back.enqueue(byte);
+    const auto backref = lzss_.back_reference();
+    const auto byte = lzss_.literal();
     if (backref.length >= minimum_back_reference_length) {
       // TODO: check if back-reference is advantageous over just encoding the plain literal
       push_back_reference(backref);
-      for (auto i = 1; i < backref.length; ++i) {
-        look_back.enqueue(look_ahead.dequeue());
-      }
+      lzss_.take_back_reference();
       return;
     }
     push_symbol(byte);
+    lzss_.take_literal();
   }
 };
 

@@ -2,7 +2,9 @@
 
 #include <stdexcept>
 #include <cstdint>
+#include <unordered_map>
 
+#include "ring_buffer.hpp"
 #include "prefix_codes.hpp"
 
 struct BackReference {
@@ -44,6 +46,49 @@ const std::uint16_t minimum_back_reference_distance = 1;
 const std::uint16_t maximum_look_back_size = 1 << 15;
 const std::uint16_t maximum_look_ahead_size = 258;
 const std::uint8_t maximum_prefix_code_length = 15;
+
+template <std::size_t LookBackSize = maximum_look_back_size, std::size_t LookAheadSize = maximum_look_ahead_size>
+class Lzss {
+private:
+  RingBuffer<std::uint8_t, LookBackSize> look_back_{};
+  RingBuffer<std::uint8_t, LookAheadSize> look_ahead_{};
+  std::unordered_map<std::uint32_t, std::uint16_t> start_by_length_three_pattern_{LookBackSize};
+  BackReference back_reference_{.distance = 0, .length = 0};
+public:
+  auto is_empty() const -> bool {
+    return look_ahead_.is_empty();
+  }
+
+  auto literal() const -> std::uint8_t {
+    return look_ahead_.peek();
+  }
+
+  auto back_reference() const -> BackReference {
+    return back_reference_;
+  }
+
+  auto take_back_reference() {
+    for (auto i = 0; i < back_reference_.length; ++i) {
+      look_back_.enqueue(look_ahead_.dequeue());
+    }
+  }
+
+  auto take_literal() {
+    look_back_.enqueue(look_ahead_.dequeue());
+  }
+
+  auto step() {
+    back_reference_ = lzss(look_back_, look_ahead_);
+  }
+
+  auto step(std::uint8_t literal) {
+    look_ahead_.enqueue(literal);
+    if (!look_ahead_.is_full()) {
+      return;
+    }
+    step();
+  }
+};
 
 struct Offset {
   std::uint16_t bits;

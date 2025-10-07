@@ -94,6 +94,10 @@ public:
     return item;
   }
 
+  auto peek() const -> const T& {
+    return (*this)[0];
+  }
+
   [[nodiscard]] auto operator[](std::size_t ind) const -> const T& {
     if (ind >= size_) {
       throw std::out_of_range("Index out of bounds for current ring buffer size");
