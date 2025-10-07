@@ -30,6 +30,9 @@ public:
 
   auto put(std::uint8_t byte) {
     lzss_.step(byte);
+    if (!lzss_.is_full()) {
+      return;
+    }
     step();
   }
 

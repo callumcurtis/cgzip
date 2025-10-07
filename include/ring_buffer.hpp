@@ -12,9 +12,10 @@ private:
   std::size_t head_{}; // Index of the next element to be read from the queue
   std::size_t tail_{}; // Index where the next element will be written
 
+public:
   class const_iterator {
     public:
-        using iterator_category = std::forward_iterator_tag;
+        using iterator_category = std::random_access_iterator_tag;
         using value_type = T;
         using difference_type = std::ptrdiff_t;
         using pointer = const T*;
@@ -51,9 +52,25 @@ private:
         auto operator==(const const_iterator& other) const -> bool {
             return logical_ind_ == other.logical_ind_;
         }
+
+        auto operator+(difference_type n) const -> const_iterator {
+            return const_iterator(ring_buffer_, logical_ind_ + n);
+        }
+
+        auto operator+=(difference_type n) -> const_iterator& {
+            logical_ind_ += n;
+            return *this;
+        }
+
+        auto operator-(const const_iterator& other) const -> difference_type {
+            return static_cast<difference_type>(logical_ind_ - other.logical_ind_);
+        }
+
+        friend auto operator+(difference_type n, const const_iterator& it) -> const_iterator {
+            return it + n;
+        }
     };
 
-public:
   [[nodiscard]] auto size() const -> std::size_t {
     return size_;
   }

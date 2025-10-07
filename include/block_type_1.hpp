@@ -12,8 +12,7 @@ private:
   std::uint64_t bits_;
   OutputBitStream& out_;
   std::vector<std::variant<PrefixCode, Offset>> block;
-  RingBuffer<std::uint8_t, LookBackSize> look_back{};
-  RingBuffer<std::uint8_t, LookAheadSize> look_ahead{};
+  Lzss<LookBackSize, LookAheadSize> lzss_;
 
   static constexpr auto build_distance_prefix_codes_with_offsets() -> std::array<PrefixCodeWithOffset, maximum_look_back_size+1> {
     std::array<PrefixCodeWithOffset, maximum_look_back_size+1> prefix_codes_with_offsets{};
@@ -66,8 +65,8 @@ public:
   }
 
   auto put(std::uint8_t byte) {
-    look_ahead.enqueue(byte);
-    if (!look_ahead.is_full()) {
+    lzss_.step(byte);
+    if (!lzss_.is_full()) {
       return;
     }
     step();
@@ -76,7 +75,8 @@ public:
   auto commit(bool is_last) {
     out_.push_bit(is_last ? 1 : 0); // 1 = last block
     out_.push_bits(1, 2); // Two bit block type (in this case, block type 1)
-    while (!look_ahead.is_empty()) {
+    while (!lzss_.is_empty()) {
+      lzss_.step();
       step();
     }
     for (const auto prefix_code_or_offset : block) {
@@ -109,26 +109,24 @@ private:
   }
 
   auto step() {
-    const auto backref = lzss(look_back, look_ahead);
-    const auto byte = look_ahead.dequeue();
-    look_back.enqueue(byte);
+    const auto backref = lzss_.back_reference();
+    const auto byte = lzss_.literal();
     const auto& code = codes_.at(byte);
     if (backref.length >= minimum_back_reference_length) {
       const auto& length_encoding = length_encodings_.at(backref.length);
       const auto& distance_encoding = distance_encodings_.at(backref.distance);
-      auto num_literal_bits = code.length;
-      for (auto i = 0; i < backref.length - 1; ++i) {
-        num_literal_bits += codes_.at(look_ahead[i]).length;
+      auto num_literal_bits = 0;
+      for (auto i = lzss_.literals_in_back_reference_begin(); i != lzss_.literals_in_back_reference_end(); ++i) {
+        num_literal_bits += codes_.at(*i).length;
       }
       if (num_literal_bits >= length_encoding.prefix_code.length + length_encoding.offset.num_bits + distance_encoding.prefix_code.length + distance_encoding.offset.num_bits) {
         push_back_reference(length_encoding, distance_encoding);
-        for (auto i = 1; i < backref.length; ++i) {
-          look_back.enqueue(look_ahead.dequeue());
-        }
+        lzss_.take_back_reference();
         return;
       }
     }
     push_prefix_code(code);
+    lzss_.take_literal();
   }
 };
 

@@ -50,13 +50,19 @@ const std::uint8_t maximum_prefix_code_length = 15;
 template <std::size_t LookBackSize = maximum_look_back_size, std::size_t LookAheadSize = maximum_look_ahead_size>
 class Lzss {
 private:
+  using LookAheadRingBuffer = RingBuffer<std::uint8_t, LookAheadSize>;
+
   RingBuffer<std::uint8_t, LookBackSize> look_back_{};
-  RingBuffer<std::uint8_t, LookAheadSize> look_ahead_{};
+  LookAheadRingBuffer look_ahead_{};
   std::unordered_map<std::uint32_t, std::uint16_t> start_by_length_three_pattern_{LookBackSize};
   BackReference back_reference_{.distance = 0, .length = 0};
 public:
   auto is_empty() const -> bool {
     return look_ahead_.is_empty();
+  }
+
+  auto is_full() const -> bool {
+    return look_ahead_.is_full();
   }
 
   auto literal() const -> std::uint8_t {
@@ -65,6 +71,14 @@ public:
 
   auto back_reference() const -> BackReference {
     return back_reference_;
+  }
+
+  auto literals_in_back_reference_begin() const -> LookAheadRingBuffer::const_iterator {
+    return look_ahead_.begin();
+  }
+
+  auto literals_in_back_reference_end() const -> LookAheadRingBuffer::const_iterator {
+    return look_ahead_.begin() + back_reference_.length;
   }
 
   auto take_back_reference() {
