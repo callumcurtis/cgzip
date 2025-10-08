@@ -1,13 +1,13 @@
 #pragma once
 
+#include "block_type.hpp"
 #include "third_party/output_stream.hpp"
 
 #include "lzss.hpp"
 #include "prefix_codes.hpp"
-#include "ring_buffer.hpp"
 
 template <std::size_t LookBackSize = maximum_look_back_size, std::size_t LookAheadSize = maximum_look_ahead_size>
-class BlockType1Stream {
+class BlockType1Stream : public BlockStream {
 private:
   std::uint64_t bits_;
   OutputBitStream& out_;
@@ -56,15 +56,15 @@ private:
 public:
   explicit BlockType1Stream(OutputBitStream& output_bit_stream) : out_{output_bit_stream} {}
 
-  [[nodiscard]] auto bits() const -> std::uint64_t {
+  [[nodiscard]] auto bits(bool  /*is_last*/) -> std::uint64_t override {
     return bits_;
   }
 
-  auto reset() {
+  auto reset() -> void override {
     block.clear();
   }
 
-  auto put(std::uint8_t byte) {
+  auto put(std::uint8_t byte) -> void override {
     lzss_.put(byte);
     if (!lzss_.is_full()) {
       return;
@@ -72,7 +72,7 @@ public:
     step();
   }
 
-  auto commit(bool is_last) {
+  auto commit(bool is_last) -> void override {
     out_.push_bit(is_last ? 1 : 0); // 1 = last block
     out_.push_bits(1, 2); // Two bit block type (in this case, block type 1)
     while (!lzss_.is_empty()) {

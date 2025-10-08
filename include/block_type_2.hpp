@@ -1,5 +1,6 @@
 #pragma once
 
+#include "block_type.hpp"
 #include "third_party/output_stream.hpp"
 
 #include "package_merge.hpp"
@@ -7,7 +8,7 @@
 #include "types.hpp"
 
 template <std::size_t LookBackSize = maximum_look_back_size, std::size_t LookAheadSize = maximum_look_ahead_size>
-class BlockType2Stream {
+class BlockType2Stream : public BlockStream {
 private:
   BufferedOutputBitStream out_;
   Lzss<LookBackSize, LookAheadSize> lzss_;
@@ -18,19 +19,19 @@ private:
 public:
   explicit BlockType2Stream(OutputBitStream& output_bit_stream) : out_{BufferedOutputBitStream(output_bit_stream)} {}
 
-  [[nodiscard]] auto bits(bool is_last) -> std::size_t {
+  [[nodiscard]] auto bits(bool is_last) -> std::uint64_t override {
     buffer(is_last);
     return out_.bits();
   }
 
-  auto reset() {
+  auto reset() -> void override {
     count_by_symbol.fill(0);
     block.clear();
     out_.reset();
     is_last_and_buffered_ = false;
   }
 
-  auto put(std::uint8_t byte) {
+  auto put(std::uint8_t byte) -> void override {
     lzss_.put(byte);
     if (!lzss_.is_full()) {
       return;
@@ -38,7 +39,7 @@ public:
     step();
   }
 
-  auto commit(bool is_last) {
+  auto commit(bool is_last) -> void override {
     buffer(is_last);
     out_.commit();
     reset();
