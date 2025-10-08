@@ -206,10 +206,6 @@ public:
         return numbits;
     }
 
-    [[nodiscard]] auto unbuffered() -> OutputBitStream& {
-      return target_stream;
-    }
-
 private:
     OutputBitStream& target_stream;
     std::vector<u8> buffer; // Stores completed bytes

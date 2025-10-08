@@ -15,6 +15,12 @@ test: install data.tar
 	$(install-dir)/bin/gzip < data.tar > data.tar.gz
 	gzip -cd data.tar.gz > data.d.tar
 	diff data.d.tar data.tar
+	@echo "original file size: $$(stat -c%s data.tar)"
+	@echo "compressed file size: $$(stat -c%s data.tar.gz)"
+	@echo "gzip -9 file size: $$(stat -c%s data.tar.9.gz)"
+	@echo "gzip -6 file size: $$(stat -c%s data.tar.6.gz)"
+	@echo "gzip -5 file size: $$(stat -c%s data.tar.5.gz)"
+	@echo "gzip -1 file size: $$(stat -c%s data.tar.1.gz)"
 
 .PHONE: profile
 profile: install data.tar

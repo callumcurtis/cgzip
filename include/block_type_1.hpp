@@ -75,8 +75,10 @@ public:
   auto commit(bool is_last) {
     out_.push_bit(is_last ? 1 : 0); // 1 = last block
     out_.push_bits(1, 2); // Two bit block type (in this case, block type 1)
-    while (!lzss_.is_empty()) {
-      step();
+    if (is_last) {
+      while (!lzss_.is_empty()) {
+        step();
+      }
     }
     for (const auto prefix_code_or_offset : block) {
       if (std::holds_alternative<PrefixCode>(prefix_code_or_offset)) {

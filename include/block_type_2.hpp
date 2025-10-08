@@ -13,19 +13,21 @@ private:
   Lzss<LookBackSize, LookAheadSize> lzss_;
   std::array<std::size_t, num_ll_symbols + num_distance_symbols> count_by_symbol{};
   std::vector<std::variant<Symbol, Offset>> block;
+  bool is_last_and_buffered_ = false;
 
 public:
   explicit BlockType2Stream(OutputBitStream& output_bit_stream) : out_{BufferedOutputBitStream(output_bit_stream)} {}
 
-  [[nodiscard]] auto bits() -> std::size_t {
-    buffer_all_except_last_block_flag();
-    return out_.bits() + 1;
+  [[nodiscard]] auto bits(bool is_last) -> std::size_t {
+    buffer(is_last);
+    return out_.bits();
   }
 
   auto reset() {
     count_by_symbol.fill(0);
     block.clear();
     out_.reset();
+    is_last_and_buffered_ = false;
   }
 
   auto put(std::uint8_t byte) {
@@ -37,25 +39,31 @@ public:
   }
 
   auto commit(bool is_last) {
-    buffer_all_except_last_block_flag();
-    out_.unbuffered().push_bit(is_last ? 1 : 0);
+    buffer(is_last);
     out_.commit();
     reset();
   }
 
 private:
 
-  auto buffer_all_except_last_block_flag() {
+  auto buffer(bool is_last) {
     if (out_.bits() > 0) {
       // We have already buffered
+      if (is_last_and_buffered_ != is_last) {
+        throw std::logic_error("Cannot re-buffer with different last block flag");
+      }
       return;
     }
 
+    is_last_and_buffered_ = is_last;
+
+    out_.push_bit(is_last ? 1 : 0);
     out_.push_bits(2, 2); // Two bit block type (in this case, block type 2)
 
-    // TODO: allow look-ahead into next block
-    while (!lzss_.is_empty()) {
-      step();
+    if (is_last) {
+      while (!lzss_.is_empty()) {
+        step();
+      }
     }
 
     push_symbol(eob);

@@ -47,8 +47,11 @@ int main(){
     BlockType2Stream block_type_2_stream(stream);
     CusumDistributionDetector change_point_detector(1 << 10, 1e4);
 
-    auto commit_smallest = [&block_type_0_stream, &block_type_1_stream, &block_type_2_stream](bool is_last) {
-        const std::array<std::uint64_t, 3> bits_by_block_type{block_type_0_stream.bits(), block_type_1_stream.bits(), block_type_2_stream.bits()};
+    auto commit_smallest = [&block_type_0_stream, &block_type_1_stream, &block_type_2_stream, &block_size](bool is_last) {
+        std::array<std::uint64_t, 3> bits_by_block_type{block_type_0_stream.bits(), block_type_1_stream.bits(), block_type_2_stream.bits(is_last)};
+        if (block_size >= BlockType0Stream::capacity()) {
+          bits_by_block_type.at(0) = bits_by_block_type.at(1) + 1;
+        }
         const auto smallest = std::distance(bits_by_block_type.begin(), std::ranges::min_element(bits_by_block_type));
         switch (smallest) {
           case 0:
@@ -76,7 +79,9 @@ int main(){
         crc = CRC::Calculate(&next_byte, 1, crc_table); //This call creates the initial CRC value from the first byte read.
         //Read through the input
         while(1){
-            block_type_0_stream.put(next_byte);
+            if (block_size < BlockType0Stream::capacity()) {
+              block_type_0_stream.put(next_byte);
+            }
             block_type_1_stream.put(next_byte);
             block_type_2_stream.put(next_byte);
             const auto is_change_point_detected = change_point_detector.step((double(next_byte) - 128) / 128).second;
@@ -86,7 +91,7 @@ int main(){
             block_size++;
             crc = CRC::Calculate(&next_byte,1, crc_table, crc); //Add the character we just read to the CRC (even though it is not in a block yet)
 
-            if (block_size >= BlockType0Stream::capacity() || is_change_point_detected) {
+            if (is_change_point_detected) {
                 commit_smallest(false);
                 block_type_0_stream.reset();
                 block_type_1_stream.reset();
