@@ -29,7 +29,7 @@ public:
   }
 
   auto put(std::uint8_t byte) {
-    lzss_.step(byte);
+    lzss_.put(byte);
     if (!lzss_.is_full()) {
       return;
     }
@@ -55,7 +55,6 @@ private:
 
     // TODO: allow look-ahead into next block
     while (!lzss_.is_empty()) {
-      lzss_.step();
       step();
     }
 

@@ -65,7 +65,7 @@ public:
   }
 
   auto put(std::uint8_t byte) {
-    lzss_.step(byte);
+    lzss_.put(byte);
     if (!lzss_.is_full()) {
       return;
     }
@@ -76,7 +76,6 @@ public:
     out_.push_bit(is_last ? 1 : 0); // 1 = last block
     out_.push_bits(1, 2); // Two bit block type (in this case, block type 1)
     while (!lzss_.is_empty()) {
-      lzss_.step();
       step();
     }
     for (const auto prefix_code_or_offset : block) {

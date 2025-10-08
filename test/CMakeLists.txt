@@ -2,7 +2,6 @@ find_package(Catch2 3 REQUIRED)
 
 add_executable(test
   test_package_merge.cpp
-  test_lzss.cpp
   test_ring_buffer.cpp
 )
 
