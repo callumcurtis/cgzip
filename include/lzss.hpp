@@ -13,6 +13,7 @@ struct BackReference {
 
 const std::uint16_t num_ll_symbols = 288;
 const std::uint16_t num_distance_symbols = 30;
+const std::uint16_t num_length_symbols = 29;
 const std::uint16_t eob = 256;
 const std::uint16_t minimum_back_reference_length = 3;
 const std::uint16_t minimum_back_reference_distance = 1;
@@ -243,8 +244,8 @@ struct Range {
   std::uint16_t end;
 };
 
-template <std::size_t N>
-constexpr auto get_symbols_with_offsets_from_ranges(const std::array<Range, N> ranges) -> std::array<SymbolWithOffset, N> {
+template <std::size_t R, std::size_t N>
+constexpr auto get_symbols_with_offsets_from_ranges(const std::array<Range, R> ranges) -> std::array<SymbolWithOffset, N> {
   std::array<SymbolWithOffset, N> symbols_with_offsets{};
   for (auto range : ranges) {
     for (auto point = range.start; point <= range.end; ++point) {
@@ -261,7 +262,7 @@ constexpr auto get_symbols_with_offsets_from_ranges(const std::array<Range, N> r
 }
 
 constexpr auto get_symbol_with_offset_by_distance() -> std::array<SymbolWithOffset, maximum_look_back_size+1> {
-  return get_symbols_with_offsets_from_ranges<maximum_look_back_size+1>({
+  return get_symbols_with_offsets_from_ranges<num_distance_symbols, maximum_look_back_size+1>({
          Range{0,0,1,1},         Range{1,0,2,2},          Range{2,0,3,3},           Range{3,0,4,4},           Range{4,1,5,6},
          Range{5,1,7,8},         Range{6,2,9,12},         Range{7,2,13,16},         Range{8,3,17,24},         Range{9,3,25,32},
          Range{10,4,33,48},      Range{11,4,49,64},       Range{12,5,65,96},        Range{13,5,97,128},       Range{14,6,129,192},
@@ -277,15 +278,17 @@ constexpr auto symbol_with_offset_from_distance(std::uint16_t distance) -> const
   return symbol_with_offset_by_distance.at(distance);
 }
 
+inline constexpr auto length_ranges = std::array<Range, num_length_symbols>{
+  Range{257,0,3,3},     Range{258,0,4,4},     Range{259,0,5,5},     Range{260,0,6,6},     {261,0,7,7},
+  Range{262,0,8,8},     Range{263,0,9,9},     Range{264,0,10,10},   Range{265,1,11,12},   {266,1,13,14},
+  Range{267,1,15,16},   Range{268,1,17,18},   Range{269,2,19,22},   Range{270,2,23,26},   {271,2,27,30},
+  Range{272,2,31,34},   Range{273,3,35,42},   Range{274,3,43,50},   Range{275,3,51,58},   {276,3,59,66},
+  Range{277,4,67,82},   Range{278,4,83,98},   Range{279,4,99,114},  Range{280,4,115,130}, {281,5,131,162},
+  Range{282,5,163,194}, Range{283,5,195,226}, Range{284,5,227,257}, Range{285,0,258,258}
+};
+
 constexpr auto get_symbol_with_offset_by_length() -> std::array<SymbolWithOffset, maximum_look_ahead_size+1> {
-    return get_symbols_with_offsets_from_ranges<maximum_look_ahead_size+1>({
-            Range{257,0,3,3},     Range{258,0,4,4},     Range{259,0,5,5},     Range{260,0,6,6},     {261,0,7,7},
-            Range{262,0,8,8},     Range{263,0,9,9},     Range{264,0,10,10},   Range{265,1,11,12},   {266,1,13,14},
-            Range{267,1,15,16},   Range{268,1,17,18},   Range{269,2,19,22},   Range{270,2,23,26},   {271,2,27,30},
-            Range{272,2,31,34},   Range{273,3,35,42},   Range{274,3,43,50},   Range{275,3,51,58},   {276,3,59,66},
-            Range{277,4,67,82},   Range{278,4,83,98},   Range{279,4,99,114},  Range{280,4,115,130}, {281,5,131,162},
-            Range{282,5,163,194}, Range{283,5,195,226}, Range{284,5,227,257}, Range{285,0,258,258}
-    });
+    return get_symbols_with_offsets_from_ranges<num_length_symbols, maximum_look_ahead_size+1>(length_ranges);
 }
 
 inline constexpr std::array<SymbolWithOffset, maximum_look_ahead_size+1> symbol_with_offset_by_length{get_symbol_with_offset_by_length()};
@@ -294,3 +297,16 @@ constexpr auto symbol_with_offset_from_length(std::uint16_t length) -> const Sym
   return symbol_with_offset_by_length.at(length);
 }
 
+constexpr auto get_length_starts_by_symbol() -> std::array<std::uint16_t, num_length_symbols> {
+  std::array<std::uint16_t, num_length_symbols> length_starts_by_symbol{};
+  for (auto i = 0; i < num_length_symbols; ++i) {
+    length_starts_by_symbol.at(i) = length_ranges.at(i).start;
+  }
+  return length_starts_by_symbol;
+}
+
+inline constexpr std::array<std::uint16_t, num_length_symbols> length_starts_by_symbol{get_length_starts_by_symbol()};
+
+constexpr auto length_from_symbol_with_offset(SymbolWithOffset symbol_with_offset) -> std::uint16_t {
+  return length_starts_by_symbol.at(symbol_with_offset.symbol - length_ranges.at(0).symbol) + symbol_with_offset.offset.bits;
+}

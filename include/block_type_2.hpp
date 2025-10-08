@@ -60,10 +60,8 @@ private:
     out_.push_bit(is_last ? 1 : 0);
     out_.push_bits(2, 2); // Two bit block type (in this case, block type 2)
 
-    if (is_last) {
-      while (!lzss_.is_empty()) {
-        step();
-      }
+    while (!lzss_.is_empty()) {
+      step();
     }
 
     push_symbol(eob);
@@ -80,13 +78,17 @@ private:
     block.emplace_back(offset);
   }
 
-  auto push_back_reference(const BackReference& back_reference) {
+  auto push_back_reference() {
+    const auto back_reference = lzss_.back_reference();
     const auto length_symbol_with_offset = symbol_with_offset_from_length(back_reference.length);
     const auto distance_symbol_with_offset = symbol_with_offset_from_distance(back_reference.distance);
     push_symbol(length_symbol_with_offset.symbol);
     push_offset(length_symbol_with_offset.offset);
     push_symbol(distance_symbol_with_offset.symbol + num_ll_symbols);
     push_offset(distance_symbol_with_offset.offset);
+    for (auto i = lzss_.literals_in_back_reference_begin(); i != lzss_.literals_in_back_reference_end(); ++i) {
+      block.emplace_back(*i);
+    }
   }
 
   struct CodeLengthOffset {
@@ -99,7 +101,7 @@ private:
     CodeLengthOffset offset;
   };
 
-  auto code_length_symbols(
+  auto flush_metadata(
     const std::array<PrefixCode, num_ll_symbols>& literal_length_prefix_codes,
     const std::array<PrefixCode, num_distance_symbols>& distance_prefix_codes
   ) {
@@ -243,32 +245,59 @@ private:
     const auto distance_lengths = package_merge(std::span<std::size_t, num_distance_symbols>(count_by_symbol.begin() + num_ll_symbols, count_by_symbol.end()), maximum_prefix_code_length);
     const auto ll_codes = prefix_codes(std::span<const std::uint8_t, num_ll_symbols>(ll_lengths));
     const auto distance_codes = prefix_codes(std::span<const std::uint8_t, num_distance_symbols>(distance_lengths));
-    code_length_symbols(ll_codes, distance_codes);
-    for (auto symbol_or_offset : block) {
-      if (std::holds_alternative<Symbol>(symbol_or_offset)) {
-        const Symbol& symbol = std::get<Symbol>(symbol_or_offset);
-        if (symbol < num_ll_symbols) {
-          out_.push_prefix_code(ll_codes.at(symbol));
+    flush_metadata(ll_codes, distance_codes);
+    auto it = block.begin();
+    while (it != block.end()) {
+      auto symbol = std::get<Symbol>(*it++);
+      if (symbol > eob) {
+        // Is the start of a back reference
+
+        auto length_prefix_code = ll_codes.at(symbol);
+        auto length_offset = std::get<Offset>(*it++);
+        auto distance_prefix_code = distance_codes.at(std::get<Symbol>(*it++) - num_ll_symbols);
+        auto distance_offset = std::get<Offset>(*it++);
+        const auto num_back_reference_bits = (
+          length_prefix_code.length
+          + length_offset.num_bits
+          + distance_prefix_code.length
+          + distance_offset.num_bits
+        );
+
+        const auto length = length_from_symbol_with_offset({.symbol = symbol, .offset = length_offset});
+        auto num_literal_bits = 0;
+        for (auto literal_it = it; literal_it != it + length; ++literal_it) {
+          const auto &code = ll_codes.at(std::get<Symbol>(*literal_it));
+          if (code.length == 0) {
+            num_literal_bits = num_back_reference_bits;
+            break;
+          }
+          num_literal_bits += code.length;
+        }
+        if (num_literal_bits < num_back_reference_bits) {
+          for (auto i = 0; i < length; ++i) {
+            out_.push_prefix_code(ll_codes.at(std::get<Symbol>(*it++)));
+          }
         } else {
-          out_.push_prefix_code(distance_codes.at(symbol - num_ll_symbols));
+          out_.push_prefix_code(length_prefix_code);
+          out_.push_offset(length_offset);
+          out_.push_prefix_code(distance_prefix_code);
+          out_.push_offset(distance_offset);
+          it += length;
         }
       } else {
-        const Offset& offset = std::get<Offset>(symbol_or_offset);
-        out_.push_offset(offset);
+        // Is a literal
+        out_.push_prefix_code(ll_codes.at(symbol));
       }
     }
   }
 
   auto step() {
-    const auto backref = lzss_.back_reference();
-    const auto byte = lzss_.literal();
-    if (backref.length >= minimum_back_reference_length) {
-      // TODO: check if back-reference is advantageous over just encoding the plain literal
-      push_back_reference(backref);
+    if (lzss_.back_reference().length >= minimum_back_reference_length) {
+      push_back_reference();
       lzss_.take_back_reference();
       return;
     }
-    push_symbol(byte);
+    push_symbol(lzss_.literal());
     lzss_.take_literal();
   }
 };

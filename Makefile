@@ -13,7 +13,7 @@ test: install data.tar
 	$(build-dir)/test/test
 	$(install-dir)/bin/gzip < data.tar > data.tar.gz
 	gzip -cd data.tar.gz > data.d.tar
-	diff data.d.tar data.tar
+	diff data.d.tar data.tar -s
 	@echo "original file size: $$(stat -c%s data.tar)"
 	@echo "compressed file size: $$(stat -c%s data.tar.gz)"
 	@echo "gzip -9 file size: $$(stat -c%s data.tar.9.gz)"
