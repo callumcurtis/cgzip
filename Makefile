@@ -11,7 +11,6 @@ test: install data.tar
 	cmake -S . -B $(build-dir)
 	cmake --build $(build-dir) --target test
 	$(build-dir)/test/test
-	$(install-dir)/bin/gzip < data/calgary_corpus/book1 > book1.gz
 	$(install-dir)/bin/gzip < data.tar > data.tar.gz
 	gzip -cd data.tar.gz > data.d.tar
 	diff data.d.tar data.tar

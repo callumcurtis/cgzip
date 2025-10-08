@@ -45,7 +45,7 @@ int main(){
     BlockType0Stream block_type_0_stream(stream);
     BlockType1Stream block_type_1_stream(stream);
     BlockType2Stream block_type_2_stream(stream);
-    CusumDistributionDetector change_point_detector(1 << 10, 1e4);
+    CusumDistributionDetector change_point_detector(1 << 13, 1e3);
 
     auto commit_smallest = [&block_type_0_stream, &block_type_1_stream, &block_type_2_stream, &block_size](bool is_last) {
         std::array<std::uint64_t, 3> bits_by_block_type{block_type_0_stream.bits(), block_type_1_stream.bits(), block_type_2_stream.bits(is_last)};
@@ -84,7 +84,7 @@ int main(){
             }
             block_type_1_stream.put(next_byte);
             block_type_2_stream.put(next_byte);
-            const auto is_change_point_detected = change_point_detector.step((double(next_byte) - 128) / 128).second;
+            const auto is_change_point_detected = change_point_detector.step(next_byte).second;
             if (!std::cin.get(next_byte))
                 break;
             bytes_read++;
