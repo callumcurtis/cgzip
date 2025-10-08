@@ -6,8 +6,11 @@ build-dir = $(shell pwd)/build
 data.tar:
 	tar -cf data.tar data
 
+data.tar.%.gz: data.tar
+	gzip -$* -c data.tar > $@
+
 .PHONY: test
-test: install data.tar
+test: install data.tar data.tar.9.gz data.tar.6.gz data.tar.5.gz data.tar.1.gz
 	cmake -S . -B $(build-dir)
 	cmake --build $(build-dir) --target test
 	$(build-dir)/test/test

@@ -13,4 +13,3 @@ target_link_libraries(gzip
 )
 
 install(TARGETS gzip DESTINATION bin)
-

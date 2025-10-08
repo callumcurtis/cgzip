@@ -1,5 +1,5 @@
 add_library(gzipLib
-  foo.cpp
+  gz.cpp
 )
 
 target_include_directories(gzipLib

@@ -7,6 +7,7 @@
 #define CRCPP_USE_CPP11
 #include "third_party/CRC.h"
 
+#include "gz.hpp"
 #include "change_point_detection.hpp"
 #include "block_type.hpp"
 #include "block_type_0.hpp"
@@ -27,13 +28,7 @@ int main(){
     auto crc_table = CRC::CRC_32().MakeTable();
 
     //Push a basic gzip header
-    stream.push_bytes( 0x1f, 0x8b, //Magic Number
-        0x08, //Compression (0x08 = DEFLATE)
-        0x00, //Flags
-        0x00, 0x00, 0x00, 0x00, //MTIME (little endian)
-        0x00, //Extra flags
-        0x03 //OS (Linux)
-    );
+    gz::push_header(stream);
 
     //Note that the types u8, u16 and u32 are defined in the output_stream.hpp header
     u32 bytes_read {0};
@@ -119,9 +114,7 @@ int main(){
         stream.flush_to_byte();
     }
 
-    //Now close out the bitstream by writing the CRC and the total number of bytes stored.
-    stream.push_u32(crc);
-    stream.push_u32(bytes_read);
+    gz::push_footer(stream, crc, bytes_read);
 
     return 0;
 }
