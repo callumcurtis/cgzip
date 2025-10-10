@@ -1,5 +1,6 @@
 add_library(gzipLib
   gz.cpp
+  deflate.cpp
 )
 
 target_include_directories(gzipLib

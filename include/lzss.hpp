@@ -3,8 +3,8 @@
 #include <cstdint>
 #include <unordered_map>
 
+#include "types.hpp"
 #include "ring_buffer.hpp"
-#include "prefix_codes.hpp"
 
 struct BackReference {
   std::size_t distance;
@@ -220,16 +220,6 @@ public:
     look_ahead_.enqueue(literal);
     clear_cached_back_reference();
   }
-};
-
-struct Offset {
-  std::uint16_t bits;
-  std::uint8_t num_bits;
-};
-
-struct PrefixCodeWithOffset {
-  PrefixCode prefix_code;
-  Offset offset;
 };
 
 struct SymbolWithOffset {

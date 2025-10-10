@@ -5,12 +5,9 @@
 #include <span>
 #include <vector>
 
-using code_bits_t = std::uint16_t;
+#include "types.hpp"
 
-struct PrefixCode {
-  code_bits_t bits;
-  std::uint8_t length;
-};
+using code_bits_t = std::uint16_t;
 
 template <std::size_t N>
 constexpr auto prefix_codes(std::span<const std::uint8_t, N> lengths) -> std::array<PrefixCode, N> {
@@ -52,4 +49,3 @@ constexpr auto prefix_codes(std::span<const std::uint8_t, N> lengths) -> std::ar
 
   return codes;
 }
-

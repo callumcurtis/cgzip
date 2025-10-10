@@ -1,8 +1,8 @@
 #pragma once
 
 #include "block_type.hpp"
-#include "third_party/output_stream.hpp"
-
+#include "gz.hpp"
+#include "deflate.hpp"
 #include "package_merge.hpp"
 #include "lzss.hpp"
 #include "types.hpp"
@@ -10,24 +10,24 @@
 template <std::size_t LookBackSize = maximum_look_back_size, std::size_t LookAheadSize = maximum_look_ahead_size>
 class BlockType2Stream : public BlockStream {
 private:
-  BufferedOutputBitStream out_;
+  deflate::BufferedBitStream buffered_out_;
   Lzss<LookBackSize, LookAheadSize> lzss_;
   std::array<std::size_t, num_ll_symbols + num_distance_symbols> count_by_symbol{};
   std::vector<std::variant<Symbol, Offset>> block;
   bool is_last_and_buffered_ = false;
 
 public:
-  explicit BlockType2Stream(OutputBitStream& output_bit_stream) : out_{BufferedOutputBitStream(output_bit_stream)} {}
+  explicit BlockType2Stream(gz::BitStream& bit_stream) : buffered_out_{bit_stream} {}
 
   [[nodiscard]] auto bits(bool is_last) -> std::uint64_t override {
     buffer(is_last);
-    return out_.bits();
+    return buffered_out_.bits();
   }
 
   auto reset() -> void override {
     count_by_symbol.fill(0);
     block.clear();
-    out_.reset();
+    buffered_out_.reset();
     is_last_and_buffered_ = false;
   }
 
@@ -41,14 +41,13 @@ public:
 
   auto commit(bool is_last) -> void override {
     buffer(is_last);
-    out_.commit();
-    reset();
+    buffered_out_.commit();
   }
 
 private:
 
   auto buffer(bool is_last) {
-    if (out_.bits() > 0) {
+    if (buffered_out_.bits() > 0) {
       // We have already buffered
       if (is_last_and_buffered_ != is_last) {
         throw std::logic_error("Cannot re-buffer with different last block flag");
@@ -58,8 +57,10 @@ private:
 
     is_last_and_buffered_ = is_last;
 
-    out_.push_bit(is_last ? 1 : 0);
-    out_.push_bits(2, 2); // Two bit block type (in this case, block type 2)
+    const auto block_type = 2;
+    const auto num_block_type_bits = 2;
+    buffered_out_.push_bit(is_last ? 1 : 0);
+    buffered_out_.push_bits(block_type, num_block_type_bits);
 
     while (!lzss_.is_empty()) {
       step();
@@ -223,20 +224,20 @@ private:
     };
     const auto num_leading_code_length_prefix_codes = count_leading_prefix_codes(4, num_code_length_symbols, count_trailing_zero_length_prefix_codes(reordered_code_length_prefix_codes));
 
-    out_.push_bits(num_leading_literal_length_prefix_codes - 257, 5);
-    out_.push_bits(num_leading_distance_prefix_codes - 1, 5);
-    out_.push_bits(num_leading_code_length_prefix_codes - 4, 4);
+    buffered_out_.push_bits(num_leading_literal_length_prefix_codes - 257, 5);
+    buffered_out_.push_bits(num_leading_distance_prefix_codes - 1, 5);
+    buffered_out_.push_bits(num_leading_code_length_prefix_codes - 4, 4);
     for (std::uint8_t i = 0; i < num_leading_code_length_prefix_codes; ++i) {
-      out_.push_bits(reordered_code_length_prefix_codes.at(i).length, 3);
+      buffered_out_.push_bits(reordered_code_length_prefix_codes.at(i).length, 3);
     }
     for (const auto& symbol_or_symbol_with_offset : cl_symbols) {
       if (std::holds_alternative<CodeLengthSymbolWithOffset>(symbol_or_symbol_with_offset)) {
         const CodeLengthSymbolWithOffset& symbol_with_offset = std::get<CodeLengthSymbolWithOffset>(symbol_or_symbol_with_offset);
-        out_.push_prefix_code(code_length_prefix_codes.at(symbol_with_offset.symbol));
-        out_.push_bits(symbol_with_offset.offset.bits, symbol_with_offset.offset.num_bits);
+        buffered_out_.push_prefix_code(code_length_prefix_codes.at(symbol_with_offset.symbol));
+        buffered_out_.push_bits(symbol_with_offset.offset.bits, symbol_with_offset.offset.num_bits);
       } else {
         const std::uint8_t symbol = std::get<std::uint8_t>(symbol_or_symbol_with_offset);
-        out_.push_prefix_code(code_length_prefix_codes.at(symbol));
+        buffered_out_.push_prefix_code(code_length_prefix_codes.at(symbol));
       }
     }
   }
@@ -276,18 +277,18 @@ private:
         }
         if (num_literal_bits < num_back_reference_bits) {
           for (auto i = 0; i < length; ++i) {
-            out_.push_prefix_code(ll_codes.at(std::get<Symbol>(*it++)));
+            buffered_out_.push_prefix_code(ll_codes.at(std::get<Symbol>(*it++)));
           }
         } else {
-          out_.push_prefix_code(length_prefix_code);
-          out_.push_offset(length_offset);
-          out_.push_prefix_code(distance_prefix_code);
-          out_.push_offset(distance_offset);
+          buffered_out_.push_prefix_code(length_prefix_code);
+          buffered_out_.push_offset(length_offset);
+          buffered_out_.push_prefix_code(distance_prefix_code);
+          buffered_out_.push_offset(distance_offset);
           it += length;
         }
       } else {
         // Is a literal
-        out_.push_prefix_code(ll_codes.at(symbol));
+        buffered_out_.push_prefix_code(ll_codes.at(symbol));
       }
     }
   }

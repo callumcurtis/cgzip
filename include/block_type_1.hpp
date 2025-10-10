@@ -1,17 +1,16 @@
 #pragma once
 
 #include "block_type.hpp"
-#include "third_party/output_stream.hpp"
-
+#include "deflate.hpp"
+#include "gz.hpp"
+#include "types.hpp"
 #include "lzss.hpp"
 #include "prefix_codes.hpp"
 
 template <std::size_t LookBackSize = maximum_look_back_size, std::size_t LookAheadSize = maximum_look_ahead_size>
 class BlockType1Stream : public BlockStream {
 private:
-  std::uint64_t bits_;
-  OutputBitStream& out_;
-  std::vector<std::variant<PrefixCode, Offset>> block;
+  deflate::BufferedBitStream buffered_out_;
   Lzss<LookBackSize, LookAheadSize> lzss_;
 
   static constexpr auto build_distance_prefix_codes_with_offsets() -> std::array<PrefixCodeWithOffset, maximum_look_back_size+1> {
@@ -54,14 +53,14 @@ private:
   static constexpr std::array<PrefixCodeWithOffset, maximum_look_ahead_size+1> length_encodings_{build_length_prefix_codes_with_offsets(codes_)};
   static constexpr std::array<PrefixCodeWithOffset, maximum_look_back_size+1> distance_encodings_{build_distance_prefix_codes_with_offsets()};
 public:
-  explicit BlockType1Stream(OutputBitStream& output_bit_stream) : out_{output_bit_stream} {}
+  explicit BlockType1Stream(gz::BitStream& bit_stream) : buffered_out_{bit_stream} {}
 
   [[nodiscard]] auto bits(bool  /*is_last*/) -> std::uint64_t override {
-    return bits_;
+    return buffered_out_.bits();
   }
 
   auto reset() -> void override {
-    block.clear();
+    buffered_out_.reset();
   }
 
   auto put(std::uint8_t byte) -> void override {
@@ -73,39 +72,19 @@ public:
   }
 
   auto commit(bool is_last) -> void override {
-    out_.push_bit(is_last ? 1 : 0); // 1 = last block
-    out_.push_bits(1, 2); // Two bit block type (in this case, block type 1)
+    const auto block_type = 1;
+    const auto num_block_type_bits = 2;
+    auto& unbuffered_out = buffered_out_.unbuffered();
+    unbuffered_out.push_bit(is_last ? 1 : 0);
+    unbuffered_out.push_bits(block_type, num_block_type_bits);
     while (!lzss_.is_empty()) {
       step();
     }
-    for (const auto prefix_code_or_offset : block) {
-      if (std::holds_alternative<PrefixCode>(prefix_code_or_offset)) {
-        out_.push_prefix_code(std::get<PrefixCode>(prefix_code_or_offset));
-      } else {
-        out_.push_offset(std::get<Offset>(prefix_code_or_offset));
-      }
-    }
-    out_.push_prefix_code(codes_.at(eob));
-    reset();
+    buffered_out_.commit();
+    unbuffered_out.push_prefix_code(codes_.at(eob));
   }
 
 private:
-  auto push_prefix_code(const PrefixCode& prefix_code) {
-    block.emplace_back(prefix_code);
-    bits_ += prefix_code.length;
-  }
-
-  auto push_offset(const Offset& offset) {
-    block.emplace_back(offset);
-    bits_ += offset.num_bits;
-  }
-
-  auto push_back_reference(const PrefixCodeWithOffset& length, const PrefixCodeWithOffset& distance) {
-    push_prefix_code(length.prefix_code);
-    push_offset(length.offset);
-    push_prefix_code(distance.prefix_code);
-    push_offset(distance.offset);
-  }
 
   auto step() {
     const auto backref = lzss_.back_reference();
@@ -119,12 +98,15 @@ private:
         num_literal_bits += codes_.at(*i).length;
       }
       if (num_literal_bits >= length_encoding.prefix_code.length + length_encoding.offset.num_bits + distance_encoding.prefix_code.length + distance_encoding.offset.num_bits) {
-        push_back_reference(length_encoding, distance_encoding);
+        buffered_out_.push_back_reference(PrefixCodedBackReference{
+          .length = length_encoding,
+          .distance = distance_encoding
+        });
         lzss_.take_back_reference();
         return;
       }
     }
-    push_prefix_code(code);
+    buffered_out_.push_prefix_code(code);
     lzss_.take_literal();
   }
 };
