@@ -2,6 +2,8 @@
 
 PASSED=0
 FAILED=0
+BEAT_STANDARD_COUNT=0
+STANDARD_LEVEL=5
 
 ALL_DIFFERENCES=""
 
@@ -17,7 +19,7 @@ while IFS= read -r filename; do
     else
         OLDSIZE=$(wc -c "$filename" | awk '{print $1}')
         NEWSIZE=$(wc -c validate_temp.bin | awk '{print $1}')
-        STANDARDSIZE=$(gzip -c "$filename" | wc -c)
+        STANDARDSIZE=$(gzip -$STANDARD_LEVEL -c "$filename" | wc -c)
 
         MYRATIO=$(awk -v old="$OLDSIZE" -v new="$NEWSIZE" 'BEGIN { printf "%.2f", 100 * old / new }')
         STANDARDRATIO=$(awk -v old="$OLDSIZE" -v standard="$STANDARDSIZE" 'BEGIN { printf "%.2f", 100 * old / standard }')
@@ -31,10 +33,14 @@ while IFS= read -r filename; do
                 }
             }
         ')
+        
+        if awk -v my="$MYRATIO" -v standard="$STANDARDRATIO" 'BEGIN { exit !(my > standard) }'; then
+            BEAT_STANDARD_COUNT=$(( BEAT_STANDARD_COUNT + 1 ))
+        fi
 
         ALL_DIFFERENCES+="$DIFFERENCE "
 
-        printf "%-40s | %-6s | compression ratio: %8s%% | compression ratio vs. standard gzip: %5s%%\n" \
+        printf "%-40s | %-6s | compression ratio: %8s%% | compression ratio vs. standard gzip (level ${STANDARD_LEVEL}) (relative %%): %5s%%\n" \
             "${filename:0:37}" "PASSED" "$MYRATIO" "$DIFFERENCE"
 
         PASSED=$(( PASSED + 1 ))
@@ -47,6 +53,8 @@ TOTAL=$(( PASSED + FAILED ))
 
 echo "--------------------------------------------------------"
 echo "${PASSED}/${TOTAL} passed, ${FAILED}/${TOTAL} failed."
+
+echo "Custom compressor beat standard compressor (level ${STANDARD_LEVEL}): ${BEAT_STANDARD_COUNT}/${TOTAL} times."
 
 if [ "$PASSED" -gt 0 ]; then
     echo "$ALL_DIFFERENCES" | awk '
