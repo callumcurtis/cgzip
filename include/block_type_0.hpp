@@ -3,6 +3,7 @@
 #include "gz.hpp"
 #include "deflate.hpp"
 #include "block_type.hpp"
+#include "size.hpp"
 
 class BlockType0Stream : public BlockStream {
 private:
@@ -16,7 +17,7 @@ public:
   }
 
   [[nodiscard]] auto bits(bool  /*is_last*/) -> std::uint64_t override {
-    return 40 + (block_.size() * 8);
+    return 40 + (block_.size() * size_of_in_bits<decltype(block_)::value_type>());
   }
 
   auto reset() -> void override {

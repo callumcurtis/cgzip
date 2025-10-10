@@ -3,8 +3,7 @@
 #include <memory>
 #include <array>
 
-// To compute CRC32 values, we can use this library
-// from https://github.com/d-bahr/CRCpp
+// https://github.com/d-bahr/CRCpp
 #define CRCPP_USE_CPP11
 #include "third_party/CRC.h"
 
@@ -28,7 +27,6 @@ auto main() -> int {
 
     auto crc_table = CRC::CRC_32().MakeTable();
 
-    //Push the gzip header
     stream.push_header();
 
     std::uint32_t bytes_read {0};
@@ -40,7 +38,6 @@ auto main() -> int {
     //whether there are more blocks coming), so at each step, next_byte will be the next byte from the stream
     //that is NOT in a block.
 
-    //Keep a running CRC of the data we read.
     std::uint32_t crc {};
 
     const auto block_streams_with_breakpoints = std::array<BlockStreamWithBreakpoint, 3>{

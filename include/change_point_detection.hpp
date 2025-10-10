@@ -1,9 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <vector>
 #include <cmath>
 #include <utility>
-#include <algorithm>
 
 constexpr int NUM_CLASSES = 256;
 
@@ -14,100 +14,97 @@ constexpr int NUM_CLASSES = 256;
 class CusumDistributionDetector {
 public:
     CusumDistributionDetector(int t_warmup, double h_threshold)
-        : _t_warmup(t_warmup), _h_threshold(h_threshold) {
-        reset();
+        : t_warmup_(t_warmup), h_threshold_(h_threshold) {}
+
+    auto reset() -> void {
+        current_t_ = 0;
+        current_obs_count_ = 0;
+        cusum_statistic_ = 0.0;
+
+        std::ranges::fill(baseline_counts_, 0.0);
+        std::ranges::fill(baseline_probs_, 0.0);
+        std::ranges::fill(current_counts_, 0.0);
     }
 
-    void reset() {
-        current_t = 0;
-        current_obs_count = 0;
-
-        // CUSUM state variable: S_t = max(0, S_{t-1} + LLR_t - drift_k)
-        cusum_statistic = 0.0;
-
-        std::fill(baseline_counts.begin(), baseline_counts.end(), 0.0);
-        std::fill(baseline_probs.begin(), baseline_probs.end(), 0.0);
-        std::fill(current_counts.begin(), current_counts.end(), 0.0);
-    }
-
-    std::pair<double, bool> step(int y) {
+    auto step(int y) -> std::pair<double, bool> {
         if (y < 0 || y >= NUM_CLASSES) {
-            return std::make_pair(cusum_statistic, false);
+            return std::make_pair(cusum_statistic_, false);
         }
 
-        _update_data(y);
+        update_data(y);
 
-        if (current_t == _t_warmup) {
-            _init_params();
+        if (current_t_ == t_warmup_) {
+            init_params();
         }
 
-        if (current_t >= _t_warmup) {
-            std::pair<double, bool> result = _check_for_changepoint(y);
-            double current_cusum = result.first;
-            bool is_changepoint = result.second;
+        if (current_t_ >= t_warmup_) {
+            const std::pair<double, bool> result = check_for_changepoint(y);
+            const double current_cusum = result.first;
+            const bool is_changepoint = result.second;
 
             if (is_changepoint) {
                 reset();
             }
+
             return std::make_pair(current_cusum, is_changepoint);
-        } else {
-            return std::make_pair(0.0, false);
         }
+
+        return std::make_pair(0.0, false);
     }
 
 private:
-    int _t_warmup;
-    double _h_threshold;
+    int t_warmup_;
+    double h_threshold_;
 
-    int current_t;
-    int current_obs_count;
-    double cusum_statistic;
+    int current_t_{0};
+    int current_obs_count_{0};
+    double cusum_statistic_{0.0};
 
-    std::vector<double> baseline_counts = std::vector<double>(NUM_CLASSES);
-    std::vector<double> baseline_probs = std::vector<double>(NUM_CLASSES);
+    std::vector<double> baseline_counts_ = std::vector<double>(NUM_CLASSES);
+    std::vector<double> baseline_probs_ = std::vector<double>(NUM_CLASSES);
 
-    std::vector<double> current_counts = std::vector<double>(NUM_CLASSES);
+    std::vector<double> current_counts_ = std::vector<double>(NUM_CLASSES);
 
-    void _update_data(int y) {
-        current_t++;
-        current_counts[y] += 1.0;
-        current_obs_count++;
+    auto update_data(int y) -> void {
+        current_t_++;
+        current_counts_[y] += 1.0;
+        current_obs_count_++;
     }
 
-    void _init_params() {
-        if (current_obs_count == 0) return;
+    auto init_params() -> void {
+        if (current_obs_count_ == 0) {
+            return;
+        }
 
         double sum_counts = 0.0;
         for (int i = 0; i < NUM_CLASSES; ++i) {
-            baseline_counts[i] = current_counts[i];
-            sum_counts += baseline_counts[i];
+            baseline_counts_[i] = current_counts_[i];
+            sum_counts += baseline_counts_[i];
         }
 
         for (int i = 0; i < NUM_CLASSES; ++i) {
-            baseline_probs[i] = (baseline_counts[i] + 1.0) / (sum_counts + NUM_CLASSES);
+            baseline_probs_[i] = (baseline_counts_[i] + 1.0) / (sum_counts + NUM_CLASSES);
         }
 
-        std::fill(current_counts.begin(), current_counts.end(), 0.0);
-        current_obs_count = 0;
+        std::ranges::fill(current_counts_, 0.0);
+        current_obs_count_ = 0;
     }
 
-    std::pair<double, bool> _check_for_changepoint(int y) {
-        double current_sum_counts = current_obs_count;
+    auto check_for_changepoint(int y) -> std::pair<double, bool> {
+        const double current_sum_counts = current_obs_count_;
 
         if (current_sum_counts == 0) {
             return std::make_pair(0.0, false);
         }
 
-        double p1_y = (current_counts[y] + 1.0) / (current_sum_counts + NUM_CLASSES);
+        const double p1_y = (current_counts_[y] + 1.0) / (current_sum_counts + NUM_CLASSES);
+        const double p0_y = baseline_probs_[y];
+        const double llr_t = std::log(p1_y) - std::log(p0_y);
 
-        double p0_y = baseline_probs[y];
+        cusum_statistic_ = std::max(0.0, cusum_statistic_ + llr_t);
 
-        double llr_t = std::log(p1_y) - std::log(p0_y);
+        const bool is_changepoint = cusum_statistic_ > h_threshold_;
 
-        cusum_statistic = std::max(0.0, cusum_statistic + llr_t);
-
-        bool is_changepoint = cusum_statistic > _h_threshold;
-
-        return std::make_pair(cusum_statistic, is_changepoint);
+        return std::make_pair(cusum_statistic_, is_changepoint);
     }
 };

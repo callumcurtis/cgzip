@@ -38,4 +38,3 @@ TEST_CASE("prefix codes") {
     REQUIRE(codes.at(i).bits == static_cast<code_bits_t>(0b11000000 + (i-280)));
   }
 }
-

@@ -6,14 +6,15 @@
 #include "package_merge.hpp"
 #include "lzss.hpp"
 #include "types.hpp"
+#include "prefix_codes.hpp"
 
 template <std::size_t LookBackSize = maximum_look_back_size, std::size_t LookAheadSize = maximum_look_ahead_size>
 class BlockType2Stream : public BlockStream {
 private:
   deflate::BufferedBitStream buffered_out_;
   Lzss<LookBackSize, LookAheadSize> lzss_;
-  std::array<std::size_t, num_ll_symbols + num_distance_symbols> count_by_symbol{};
-  std::vector<std::variant<Symbol, Offset>> block;
+  std::array<std::size_t, num_ll_symbols + num_distance_symbols> count_by_symbol_{};
+  std::vector<std::variant<Symbol, Offset>> block_;
   bool is_last_and_buffered_ = false;
 
 public:
@@ -25,8 +26,8 @@ public:
   }
 
   auto reset() -> void override {
-    count_by_symbol.fill(0);
-    block.clear();
+    count_by_symbol_.fill(0);
+    block_.clear();
     buffered_out_.reset();
     is_last_and_buffered_ = false;
   }
@@ -72,12 +73,12 @@ private:
   }
 
   auto push_symbol(const Symbol symbol) {
-    count_by_symbol.at(symbol)++;
-    block.emplace_back(symbol);
+    count_by_symbol_.at(symbol)++;
+    block_.emplace_back(symbol);
   }
 
   auto push_offset(const Offset& offset) {
-    block.emplace_back(offset);
+    block_.emplace_back(offset);
   }
 
   auto push_back_reference() {
@@ -88,8 +89,10 @@ private:
     push_offset(length_symbol_with_offset.offset);
     push_symbol(distance_symbol_with_offset.symbol + num_ll_symbols);
     push_offset(distance_symbol_with_offset.offset);
+    // Add the literals in the back reference to the block after the back reference so that we can decide between
+    // using the literals or the back reference when flushing the block.
     for (auto i = lzss_.literals_in_back_reference_begin(); i != lzss_.literals_in_back_reference_end(); ++i) {
-      block.emplace_back(*i);
+      block_.emplace_back(*i);
     }
   }
 
@@ -243,13 +246,13 @@ private:
   }
 
   auto flush_block() {
-    const auto ll_lengths = package_merge(std::span<std::size_t, num_ll_symbols>(count_by_symbol.begin(), count_by_symbol.begin() + num_ll_symbols), maximum_prefix_code_length);
-    const auto distance_lengths = package_merge(std::span<std::size_t, num_distance_symbols>(count_by_symbol.begin() + num_ll_symbols, count_by_symbol.end()), maximum_prefix_code_length);
+    const auto ll_lengths = package_merge(std::span<std::size_t, num_ll_symbols>(count_by_symbol_.begin(), count_by_symbol_.begin() + num_ll_symbols), maximum_prefix_code_length);
+    const auto distance_lengths = package_merge(std::span<std::size_t, num_distance_symbols>(count_by_symbol_.begin() + num_ll_symbols, count_by_symbol_.end()), maximum_prefix_code_length);
     const auto ll_codes = prefix_codes(std::span<const std::uint8_t, num_ll_symbols>(ll_lengths));
     const auto distance_codes = prefix_codes(std::span<const std::uint8_t, num_distance_symbols>(distance_lengths));
     flush_metadata(ll_codes, distance_codes);
-    auto it = block.begin();
-    while (it != block.end()) {
+    auto it = block_.begin();
+    while (it != block_.end()) {
       auto symbol = std::get<Symbol>(*it++);
       if (symbol > eob) {
         // Is the start of a back reference
@@ -303,4 +306,3 @@ private:
     lzss_.take_literal();
   }
 };
-

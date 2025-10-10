@@ -11,4 +11,3 @@ target_include_directories(gzipLib
 )
 
 add_library(gzip::gzip ALIAS gzipLib)
-

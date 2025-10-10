@@ -123,4 +123,3 @@ public:
     return buffer_[physical_ind];
   }
 };
-

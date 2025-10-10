@@ -97,7 +97,8 @@ private:
       for (auto i = lzss_.literals_in_back_reference_begin(); i != lzss_.literals_in_back_reference_end(); ++i) {
         num_literal_bits += codes_.at(*i).length;
       }
-      if (num_literal_bits >= length_encoding.prefix_code.length + length_encoding.offset.num_bits + distance_encoding.prefix_code.length + distance_encoding.offset.num_bits) {
+      const auto num_back_reference_bits = length_encoding.prefix_code.length + length_encoding.offset.num_bits + distance_encoding.prefix_code.length + distance_encoding.offset.num_bits;
+      if (num_literal_bits >= num_back_reference_bits) {
         buffered_out_.push_back_reference(PrefixCodedBackReference{
           .length = length_encoding,
           .distance = distance_encoding
