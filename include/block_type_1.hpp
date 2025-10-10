@@ -60,6 +60,9 @@ public:
   }
 
   auto reset() -> void override {
+    while (!lzss_.is_empty()) {
+      step();
+    }
     buffered_out_.reset();
   }
 
