@@ -5,7 +5,7 @@
 #include "block_type.hpp"
 #include "size.hpp"
 
-class BlockType0Stream : public BlockStream {
+class BlockType0Stream final : public BlockStream {
 private:
   deflate::BitStream out_;
   std::vector<std::uint8_t> block_;

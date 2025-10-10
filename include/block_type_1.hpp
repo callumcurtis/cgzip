@@ -8,7 +8,7 @@
 #include "prefix_codes.hpp"
 
 template <std::size_t LookBackSize = maximum_look_back_size, std::size_t LookAheadSize = maximum_look_ahead_size>
-class BlockType1Stream : public BlockStream {
+class BlockType1Stream final : public BlockStream {
 private:
   deflate::BufferedBitStream buffered_out_;
   Lzss<LookBackSize, LookAheadSize> lzss_;
