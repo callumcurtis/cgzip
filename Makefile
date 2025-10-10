@@ -3,6 +3,8 @@ install-dir = $(shell pwd)/install
 build-dir = $(shell pwd)/build
 # coverage-dir = $(shell pwd)/coverage
 
+.DEFAULT_GOAL := install
+
 data.tar:
 	tar -cf data.tar data
 
@@ -48,6 +50,8 @@ install:
 	cmake -S . -B $(build-dir) -DCMAKE_INSTALL_PREFIX=$(install-dir)
 	cmake --build $(build-dir) --target gzip
 	cmake --install $(build-dir)
+# create uvgz executable for assignment submission
+	cp $(install-dir)/bin/gzip uvgz
 
 # .PHONY: format
 # format:
@@ -81,4 +85,3 @@ clean:
 	rm -rf $(build-dir) \
 		$(install-dir)
 #   $(coverage-dir)
-

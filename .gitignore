@@ -32,3 +32,6 @@ scratch/
 !data/**/*.tar
 *.txt
 !data/**/*.txt
+
+# uvgz for assignment submission
+uvgz
