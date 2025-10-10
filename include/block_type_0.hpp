@@ -5,19 +5,21 @@
 #include "block_type.hpp"
 #include "size.hpp"
 
+const std::uint16_t maximum_block_type_0_capacity = (1U << 16U) - 1;
+
+template <std::uint16_t Capacity = maximum_block_type_0_capacity>
 class BlockType0Stream final : public BlockStream {
 private:
   deflate::BitStream out_;
   std::vector<std::uint8_t> block_;
-  static const std::size_t capacity_ = (1U << 16U) - 1;
 
 public:
   explicit BlockType0Stream(gz::BitStream& bit_stream) : out_{bit_stream} {
-    block_.reserve(capacity_);
+    block_.reserve(Capacity);
   }
 
   [[nodiscard]] auto bits(bool  /*is_last*/) -> std::uint64_t override {
-    return 40 + (block_.size() * size_of_in_bits<decltype(block_)::value_type>());
+    return 40 + (block_.size() * size_of_in_bits<typename decltype(block_)::value_type>());
   }
 
   auto reset() -> void override {
@@ -25,7 +27,7 @@ public:
   }
 
   auto put(std::uint8_t byte) -> void override {
-    if (block_.size() == capacity_) {
+    if (block_.size() == Capacity) {
       throw std::logic_error("Cannot extend a block of type 1 past the maximum length represented by 16 bits");
     }
     block_.emplace_back(byte);
@@ -43,6 +45,6 @@ public:
   }
 
   [[nodiscard]] static auto capacity() -> std::size_t {
-    return capacity_;
+    return Capacity;
   }
 };

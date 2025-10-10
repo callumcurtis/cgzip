@@ -41,7 +41,7 @@ auto main() -> int {
     std::uint32_t crc {};
 
     const auto block_streams_with_breakpoints = std::array<BlockStreamWithBreakpoint, 3>{
-      BlockStreamWithBreakpoint{.block_stream=std::make_unique<BlockType0Stream>(stream), .breakpoint=BlockType0Stream::capacity()},
+      BlockStreamWithBreakpoint{.block_stream=std::make_unique<BlockType0Stream<maximum_block_type_0_capacity>>(stream), .breakpoint=maximum_block_type_0_capacity},
       // Block type 1 is only suitable for small blocks, where the overhead of block type 2 is comparatively large.
       // Since the warmup period for the change point detector is larger than the maximum desirable size of a
       // block of type 1, disable block type 1 entirely by setting its breakpoint to 0. This improves speed
