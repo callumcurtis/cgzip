@@ -16,9 +16,6 @@ flamegraph.svg
 # nix
 result
 
-# coverage
-coverage
-
 # scratch
 scratch/
 
