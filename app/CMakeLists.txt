@@ -1,5 +1,5 @@
 add_executable(gzip
-  uvgz.cpp
+  main.cpp
 )
 
 target_include_directories(gzip

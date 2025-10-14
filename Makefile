@@ -50,8 +50,6 @@ install:
 	cmake -S . -B $(build-dir) -DCMAKE_INSTALL_PREFIX=$(install-dir)
 	cmake --build $(build-dir) --target gzip
 	cmake --install $(build-dir)
-# create uvgz executable for assignment submission
-	cp $(install-dir)/bin/gzip uvgz
 
 # .PHONY: format
 # format:

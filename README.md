@@ -1,4 +1,4 @@
-# uvgz
+# gzip
 
 ## Requirements
 
@@ -186,4 +186,4 @@ beyond this size, the overhead of block type 2 is relatively small,
 making block type 2 preferable in essentially all cases. Since block type 1
 will never be used, it is disabled to improve speed. It can be re-enabled
 by increasing the breakpoint value for block type 1 from `0` to a value larger than `2^13`
-in [uvgz.cpp](app/uvgz.cpp), allowing block type 1 to be considered.
+in [main.cpp](app/main.cpp), allowing block type 1 to be considered.
