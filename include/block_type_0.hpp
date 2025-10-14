@@ -1,5 +1,10 @@
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <stdexcept>
+#include <vector>
+
 #include "block_type.hpp"
 #include "deflate.hpp"
 #include "gz.hpp"
@@ -19,8 +24,16 @@ public:
   }
 
   [[nodiscard]] auto bits(bool /*is_last*/) -> std::uint64_t override {
-    return 40 + (block_.size() *
-                 size_of_in_bits<typename decltype(block_)::value_type>());
+    return (
+        size_of_in_bits<std::uint8_t>() // is_last flag (1 bit), block type (2
+                                        // bits), and padding (up to 5 bits)
+        + size_of_in_bits<std::uint16_t>() // block length (2 bytes)
+        + size_of_in_bits<std::uint16_t>() // inverted block length (2 bytes)
+        +
+        (block_.size() *
+         size_of_in_bits<
+             typename decltype(block_)::value_type>()) // literals (1 byte each)
+    );
   }
 
   auto reset() -> void override { block_.clear(); }

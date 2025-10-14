@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <utility>
 #include <vector>
@@ -15,8 +16,13 @@
 template <std::size_t N = (1U << size_of_in_bits<std::uint8_t>())>
 class CusumDistributionDetector {
 public:
-  CusumDistributionDetector(int t_warmup, double h_threshold)
-      : t_warmup_(t_warmup), h_threshold_(h_threshold) {}
+  struct CusumDistributionDetectorParams {
+    int t_warmup;
+    double h_threshold;
+  };
+
+  explicit CusumDistributionDetector(CusumDistributionDetectorParams params)
+      : t_warmup_(params.t_warmup), h_threshold_(params.h_threshold) {}
 
   auto reset() -> void {
     current_t_ = 0;

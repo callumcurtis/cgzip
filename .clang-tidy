@@ -3,15 +3,15 @@ Checks: "*,
         -fuchsia-*,
         -altera-*,
         -google-*,
+        -cppcoreguidelines-avoid-const-or-ref-data-members,
 "
 WarningsAsErrors: "*"
 CheckOptions:
     - key: readability-function-cognitive-complexity.Threshold
-      value: 30
+      value: 32
     - key: readability-identifier-length.IgnoredLoopCounterNames
       value: "[a-z]"
     - key: readability-identifier-length.IgnoredVariableNames
       value: "[a-z]"
     - key: readability-identifier-length.IgnoredParameterNames
       value: "[a-z]"
-

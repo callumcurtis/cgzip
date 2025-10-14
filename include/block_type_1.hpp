@@ -1,5 +1,10 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+
 #include "block_type.hpp"
 #include "deflate.hpp"
 #include "gz.hpp"
@@ -24,7 +29,10 @@ private:
           symbol_with_offset_from_distance(distance);
       prefix_codes_with_offsets.at(distance) = PrefixCodeWithOffset{
           .prefix_code =
-              PrefixCode{.bits = symbol_with_offset.symbol, .length = 5},
+              PrefixCode{
+                  .bits = symbol_with_offset.symbol,
+                  .length =
+                      5}, // NOLINT (cppcoreguidelines-avoid-magic-numbers)
           .offset = symbol_with_offset.offset};
     }
     return prefix_codes_with_offsets;
@@ -33,10 +41,12 @@ private:
   static constexpr auto build_ll_prefix_codes()
       -> std::array<PrefixCode, num_ll_symbols> {
     std::array<std::uint8_t, num_ll_symbols> lengths{};
+    // NOLINTBEGIN (cppcoreguidelines-avoid-magic-numbers)
     std::fill(lengths.begin(), lengths.begin() + 144, 8);
     std::fill(lengths.begin() + 144, lengths.begin() + 256, 9);
     std::fill(lengths.begin() + 256, lengths.begin() + 280, 7);
     std::fill(lengths.begin() + 280, lengths.end(), 8);
+    // NOLINTEND (cppcoreguidelines-avoid-magic-numbers)
     return prefix_codes<num_ll_symbols>(lengths);
   }
 

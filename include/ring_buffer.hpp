@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstddef>
+#include <iterator>
 #include <stdexcept>
 
 template <typename T, std::size_t Capacity> class RingBuffer {

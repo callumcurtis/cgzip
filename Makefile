@@ -39,9 +39,9 @@ install:
 format:
 	find app include src test -type f \( -name "*.cpp" -o -name "*.hpp" \) | xargs --no-run-if-empty clang-format -i
 
-# .PHONY: lint
-# lint:
-# 	find include src -type f \( -name "*.cpp" -o -name "*.hpp" \) | xargs --no-run-if-empty -n 1 -P 8 clang-tidy -fix -p $(build-dir)
+.PHONY: lint
+lint:
+	find app include src -type f \( -name "*.cpp" -o -name "*.hpp" \) | xargs --no-run-if-empty -n 1 -P 8 clang-tidy -fix -p $(build-dir)
 
 # .PHONY: lint-changed
 # lint-changed:

@@ -1,5 +1,15 @@
 #pragma once
 
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <span>
+#include <stdexcept>
+#include <utility>
+#include <variant>
+#include <vector>
+
 #include "block_type.hpp"
 #include "deflate.hpp"
 #include "gz.hpp"
@@ -111,10 +121,18 @@ private:
     CodeLengthOffset offset;
   };
 
-  auto flush_metadata(
+  struct CodeLengthBatchSymbol {
+    std::uint8_t symbol;
+    std::uint8_t offset_num_bits;
+    std::uint16_t min;
+    std::uint16_t max;
+  };
+
+  auto flush_block_metadata(
       const std::array<PrefixCode, num_ll_symbols> &literal_length_prefix_codes,
       const std::array<PrefixCode, num_distance_symbols>
           &distance_prefix_codes) {
+
     auto count_trailing_zero_length_prefix_codes = [](auto &prefix_codes) {
       std::uint16_t count = 0;
       for (const auto &prefix_code : prefix_codes) {
@@ -133,15 +151,25 @@ private:
       return std::max(min, std::uint16_t(max - trailing));
     };
 
+    constexpr auto min_leading_literal_length_prefix_codes = 257;
+    constexpr auto min_leading_distance_prefix_codes = 1;
+    constexpr auto min_leading_code_length_prefix_codes = 4;
+    constexpr auto literal_length_header_num_bits = 5;
+    constexpr auto distance_header_num_bits = 5;
+    constexpr auto code_length_header_num_bits = 4;
+    constexpr auto code_length_num_bits = 3;
+
+    constexpr std::uint8_t maximum_code_length = 7;
+    constexpr std::uint8_t num_code_length_symbols = 19;
+
     const auto num_leading_literal_length_prefix_codes =
-        count_leading_prefix_codes(257, num_ll_symbols,
+        count_leading_prefix_codes(min_leading_literal_length_prefix_codes,
+                                   num_ll_symbols,
                                    count_trailing_zero_length_prefix_codes(
                                        literal_length_prefix_codes));
     const auto num_leading_distance_prefix_codes = count_leading_prefix_codes(
-        1, num_distance_symbols,
+        min_leading_distance_prefix_codes, num_distance_symbols,
         count_trailing_zero_length_prefix_codes(distance_prefix_codes));
-
-    const std::uint8_t num_code_length_symbols = 19;
 
     std::array<std::uint16_t, num_code_length_symbols>
         count_by_code_length_symbol{};
@@ -150,22 +178,22 @@ private:
     std::uint8_t prev_prefix_code_length = maximum_prefix_code_length + 1;
     std::uint16_t num_prev_prefix_code_length = 0;
 
-    auto flush_prefix_code_sequence_to_code_length_symbols_batched =
+    auto add_code_length_symbol_batch =
         [&prev_prefix_code_length, &num_prev_prefix_code_length, &cl_symbols,
          &count_by_code_length_symbol](
-            const std::uint16_t min, const std::uint16_t max,
-            const std::uint8_t num_bits, const std::uint8_t batch_symbol) {
-          while (num_prev_prefix_code_length >= min) {
-            const std::uint16_t size =
-                std::min(max, num_prev_prefix_code_length);
+            CodeLengthBatchSymbol code_length_batch_symbol) {
+          while (num_prev_prefix_code_length >= code_length_batch_symbol.min) {
+            const std::uint16_t size = std::min(code_length_batch_symbol.max,
+                                                num_prev_prefix_code_length);
             num_prev_prefix_code_length -= size;
-            count_by_code_length_symbol.at(batch_symbol)++;
+            count_by_code_length_symbol.at(code_length_batch_symbol.symbol)++;
             cl_symbols.emplace_back(CodeLengthSymbolWithOffset{
-                .symbol = batch_symbol,
-                .offset = CodeLengthOffset{.bits = std::uint8_t(size - min),
-                                           .num_bits = num_bits}});
+                .symbol = code_length_batch_symbol.symbol,
+                .offset = CodeLengthOffset{
+                    .bits = std::uint8_t(size - code_length_batch_symbol.min),
+                    .num_bits = code_length_batch_symbol.offset_num_bits}});
           }
-          for (auto i = 0; i < num_prev_prefix_code_length; ++i) {
+          for (auto i = 0; std::cmp_less(i, num_prev_prefix_code_length); ++i) {
             cl_symbols.emplace_back(prev_prefix_code_length);
           }
           count_by_code_length_symbol.at(prev_prefix_code_length) +=
@@ -173,48 +201,50 @@ private:
           num_prev_prefix_code_length = 0;
         };
 
-    auto flush_prefix_code_sequence_to_code_length_symbols =
+    auto add_consecutive_prefix_codes_to_code_length_symbols =
         [&prev_prefix_code_length, &num_prev_prefix_code_length, &cl_symbols,
-         &count_by_code_length_symbol,
-         &flush_prefix_code_sequence_to_code_length_symbols_batched]() {
+         &count_by_code_length_symbol, &add_code_length_symbol_batch]() {
           if (num_prev_prefix_code_length <= 0) {
             return;
           }
 
+          constexpr auto zero_11_or_more_times = CodeLengthBatchSymbol{
+              .symbol = 18, .offset_num_bits = 7, .min = 11, .max = 138};
           if (prev_prefix_code_length == 0 &&
-              num_prev_prefix_code_length >= 11) {
-            flush_prefix_code_sequence_to_code_length_symbols_batched(11, 138,
-                                                                      7, 18);
+              num_prev_prefix_code_length >= zero_11_or_more_times.min) {
+            add_code_length_symbol_batch(zero_11_or_more_times);
             return;
           }
 
+          constexpr auto zero_3_or_more_times = CodeLengthBatchSymbol{
+              .symbol = 17, .offset_num_bits = 3, .min = 3, .max = 10};
           if (prev_prefix_code_length == 0 &&
-              num_prev_prefix_code_length >= 3) {
-            flush_prefix_code_sequence_to_code_length_symbols_batched(3, 10, 3,
-                                                                      17);
+              num_prev_prefix_code_length >= zero_3_or_more_times.min) {
+            add_code_length_symbol_batch(zero_3_or_more_times);
             return;
           }
 
+          constexpr auto previous_3_or_more_times = CodeLengthBatchSymbol{
+              .symbol = 16, .offset_num_bits = 2, .min = 3, .max = 6};
           cl_symbols.emplace_back(prev_prefix_code_length);
           count_by_code_length_symbol.at(prev_prefix_code_length)++;
           num_prev_prefix_code_length--;
           if (num_prev_prefix_code_length > 0) {
-            flush_prefix_code_sequence_to_code_length_symbols_batched(3, 6, 2,
-                                                                      16);
+            add_code_length_symbol_batch(previous_3_or_more_times);
           }
         };
 
     auto add_prefix_codes_to_code_length_symbols =
         [&prev_prefix_code_length, &num_prev_prefix_code_length,
-         &flush_prefix_code_sequence_to_code_length_symbols](const auto start,
-                                                             const auto end) {
+         &add_consecutive_prefix_codes_to_code_length_symbols](const auto start,
+                                                               const auto end) {
           for (auto prefix_code_ptr = start; prefix_code_ptr < end;
                ++prefix_code_ptr) {
             const auto prefix_code_length = prefix_code_ptr->length;
             if (prefix_code_length == prev_prefix_code_length) {
               num_prev_prefix_code_length++;
             } else {
-              flush_prefix_code_sequence_to_code_length_symbols();
+              add_consecutive_prefix_codes_to_code_length_symbols();
               prev_prefix_code_length = prefix_code_length;
               num_prev_prefix_code_length = 1;
             }
@@ -228,9 +258,8 @@ private:
     add_prefix_codes_to_code_length_symbols(
         distance_prefix_codes.begin(),
         distance_prefix_codes.begin() + num_leading_distance_prefix_codes);
-    flush_prefix_code_sequence_to_code_length_symbols();
+    add_consecutive_prefix_codes_to_code_length_symbols();
 
-    const std::uint8_t maximum_code_length = 7;
     const auto code_length_lengths =
         package_merge(std::span<std::uint16_t, num_code_length_symbols>(
                           count_by_code_length_symbol.begin(),
@@ -252,17 +281,26 @@ private:
             code_length_prefix_codes[14], code_length_prefix_codes[1],
             code_length_prefix_codes[15]};
     const auto num_leading_code_length_prefix_codes =
-        count_leading_prefix_codes(4, num_code_length_symbols,
+        count_leading_prefix_codes(min_leading_code_length_prefix_codes,
+                                   num_code_length_symbols,
                                    count_trailing_zero_length_prefix_codes(
                                        reordered_code_length_prefix_codes));
 
-    buffered_out_.push_bits(num_leading_literal_length_prefix_codes - 257, 5);
-    buffered_out_.push_bits(num_leading_distance_prefix_codes - 1, 5);
-    buffered_out_.push_bits(num_leading_code_length_prefix_codes - 4, 4);
+    buffered_out_.push_bits(num_leading_literal_length_prefix_codes -
+                                min_leading_literal_length_prefix_codes,
+                            literal_length_header_num_bits);
+    buffered_out_.push_bits(num_leading_distance_prefix_codes -
+                                min_leading_distance_prefix_codes,
+                            distance_header_num_bits);
+    buffered_out_.push_bits(num_leading_code_length_prefix_codes -
+                                min_leading_code_length_prefix_codes,
+                            code_length_header_num_bits);
+
     for (std::uint8_t i = 0; i < num_leading_code_length_prefix_codes; ++i) {
       buffered_out_.push_bits(reordered_code_length_prefix_codes.at(i).length,
-                              3);
+                              code_length_num_bits);
     }
+
     for (const auto &symbol_or_symbol_with_offset : cl_symbols) {
       if (std::holds_alternative<CodeLengthSymbolWithOffset>(
               symbol_or_symbol_with_offset)) {
@@ -294,7 +332,7 @@ private:
         prefix_codes(std::span<const std::uint8_t, num_ll_symbols>(ll_lengths));
     const auto distance_codes = prefix_codes(
         std::span<const std::uint8_t, num_distance_symbols>(distance_lengths));
-    flush_metadata(ll_codes, distance_codes);
+    flush_block_metadata(ll_codes, distance_codes);
     auto it = block_.begin();
     while (it != block_.end()) {
       auto symbol = std::get<Symbol>(*it++);
@@ -322,7 +360,7 @@ private:
           num_literal_bits += code.length;
         }
         if (num_literal_bits < num_back_reference_bits) {
-          for (auto i = 0; i < length; ++i) {
+          for (auto i = 0; std::cmp_less(i, length); ++i) {
             buffered_out_.push_prefix_code(
                 ll_codes.at(std::get<Symbol>(*it++)));
           }

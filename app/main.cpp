@@ -1,6 +1,9 @@
 #include <algorithm>
 #include <array>
+#include <cstddef>
+#include <cstdint>
 #include <iostream>
+#include <limits>
 #include <memory>
 
 // https://github.com/d-bahr/CRCpp
@@ -13,6 +16,7 @@
 #include "block_type_2.hpp"
 #include "change_point_detection.hpp"
 #include "gz.hpp"
+#include "lzss.hpp"
 
 struct BlockStreamWithBreakpoint {
   std::unique_ptr<BlockStream> block_stream;
@@ -61,8 +65,10 @@ auto main() -> int {
           BlockStreamWithBreakpoint{
               .block_stream = std::make_unique<BlockType2Stream<
                   maximum_look_back_size, maximum_look_ahead_size>>(stream),
-              .breakpoint = 1 << 30}};
-  CusumDistributionDetector change_point_detector(1 << 13, 1e3);
+              .breakpoint = 1U << 30U}};
+  CusumDistributionDetector change_point_detector(
+      {.t_warmup = 1U << 13U, // NOLINT (cppcoreguidelines-avoid-magic-numbers)
+       .h_threshold = 1e3});  // NOLINT (cppcoreguidelines-avoid-magic-numbers)
   const auto last_breakpoint =
       std::ranges::max_element(block_streams_with_breakpoints,
                                [](const auto &a, const auto &b) {
@@ -100,8 +106,8 @@ auto main() -> int {
                          crc_table); // This call creates the initial CRC value
                                      // from the first byte read.
     // Read through the input
-    while (1) {
-      for (auto &block_stream_with_breakpoint :
+    while (true) {
+      for (const auto &block_stream_with_breakpoint :
            block_streams_with_breakpoints) {
         if (uncompressed_block_size >=
             block_stream_with_breakpoint.breakpoint) {
@@ -111,8 +117,9 @@ auto main() -> int {
       }
       const auto is_change_point_detected =
           change_point_detector.step(next_byte).second;
-      if (!std::cin.get(next_byte))
+      if (!std::cin.get(next_byte)) {
         break;
+      }
       bytes_read++;
       uncompressed_block_size++;
       crc = CRC::Calculate(&next_byte, 1, crc_table,
@@ -122,7 +129,7 @@ auto main() -> int {
       if (is_change_point_detected ||
           uncompressed_block_size >= last_breakpoint) {
         commit_smallest(false);
-        for (auto &block_stream_with_breakpoint :
+        for (const auto &block_stream_with_breakpoint :
              block_streams_with_breakpoints) {
           block_stream_with_breakpoint.block_stream->reset();
         }

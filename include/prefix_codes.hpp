@@ -1,6 +1,8 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <span>
 #include <vector>
@@ -33,7 +35,8 @@ constexpr auto prefix_codes(std::span<const std::uint8_t, N> lengths)
   count_by_length[0] = 0;
   std::vector<code_bits_t> next_code_bits(max_length + 1);
   for (auto bits = 1; bits < max_length + 1; ++bits) {
-    code_bits = (code_bits + count_by_length[bits - 1]) << (unsigned int)1;
+    code_bits = static_cast<code_bits_t>(code_bits + count_by_length[bits - 1])
+                << 1U;
     next_code_bits[bits] = code_bits;
   }
 

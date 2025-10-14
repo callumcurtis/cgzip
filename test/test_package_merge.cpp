@@ -17,13 +17,13 @@ template <typename Container> auto kraft_mcmillan(Container container) {
 TEST_CASE("package merge") {
   SECTION("throws if inadequate max length") {
     std::array<std::size_t, 17> weights = {1, 3, 2, 5, 8,  10, 12, 3, 5,
-                                           7, 8, 2, 3, 67, 23, 5,  3}; // NOLINT
+                                           7, 8, 2, 3, 67, 23, 5,  3};
     REQUIRE_THROWS(package_merge<17, std::size_t>(weights, 1));
   }
 
   SECTION("kraft-mcmillan inequality") {
     std::array<std::size_t, 17> weights = {1, 3, 2, 5, 8,  10, 12, 3, 5,
-                                           7, 8, 2, 3, 67, 23, 5,  3}; // NOLINT
+                                           7, 8, 2, 3, 67, 23, 5,  3};
     auto lengths = package_merge<17, std::size_t>(weights, 15);
     REQUIRE_THAT(kraft_mcmillan(lengths),
                  Catch::Matchers::WithinAbs(1.0, 1e-6));

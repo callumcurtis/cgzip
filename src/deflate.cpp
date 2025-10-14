@@ -1,4 +1,9 @@
+#include <cstddef>
+#include <cstdint>
+
 #include "deflate.hpp"
+#include "gz.hpp"
+#include "types.hpp"
 
 auto deflate::BitStreamMixin::push_prefix_code(PrefixCode prefix_code) -> void {
   push_symbolic_bits(prefix_code.bits, prefix_code.length);

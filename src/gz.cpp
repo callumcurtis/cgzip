@@ -1,15 +1,20 @@
+#include <cstddef>
+#include <cstdint>
+#include <ostream>
+
 #include "gz.hpp"
 #include "size.hpp"
 
 auto gz::BitStreamMixin::push_header() -> void {
-  push(static_cast<std::uint8_t>(0x1f),
-       static_cast<std::uint8_t>(0x8b),  // Magic Number
-       static_cast<std::uint8_t>(0x08),  // Compression (0x08 = DEFLATE)
-       static_cast<std::uint8_t>(0x00),  // Flags
-       static_cast<std::uint32_t>(0x00), // MTIME (little endian)
-       static_cast<std::uint8_t>(0x00),  // Extra flags
-       static_cast<std::uint8_t>(0x03)   // OS (Linux)
-  );
+  const auto magic_number_1 = static_cast<std::uint8_t>(0x1f);
+  const auto magic_number_2 = static_cast<std::uint8_t>(0x8b);
+  const auto deflate = static_cast<std::uint8_t>(0x08);
+  const auto no_flags = static_cast<std::uint8_t>(0x00);
+  const auto mtime_epoch = static_cast<std::uint32_t>(0x00);
+  const auto no_extra_flags = static_cast<std::uint8_t>(0x00);
+  const auto os_linux = static_cast<std::uint8_t>(0x03);
+  push(magic_number_1, magic_number_2, deflate, no_flags, mtime_epoch,
+       no_extra_flags, os_linux);
 }
 
 auto gz::BitStreamMixin::push_footer(std::uint32_t crc_on_uncompressed,
@@ -36,7 +41,7 @@ auto gz::BitStream::flush_byte() -> void {
   if (num_bits_ == 0) {
     return;
   }
-  out_.put(static_cast<unsigned char>(bits_));
+  out_.put(static_cast<char>(bits_));
   bits_ = 0;
   num_bits_ = 0;
 }
