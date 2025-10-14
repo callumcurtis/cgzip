@@ -38,7 +38,6 @@
             catch2_3
             python313
             llvmPackages_20.clang-tools
-            lcov
             flamegraph.packages.${system}.default
             gzstat
           ];

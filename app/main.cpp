@@ -44,9 +44,9 @@ auto main() -> int {
       std::array<BlockStreamWithMaximumBlockSize, 3>{
           BlockStreamWithMaximumBlockSize{
               .block_stream = std::make_unique<
-                  BlockType0Stream<maximum_block_type_0_capacity>>(stream),
+                  block_type_0::Stream<block_type_0::maximum_capacity>>(stream),
               .maximum_uncompressed_bytes_in_block =
-                  maximum_block_type_0_capacity},
+                  block_type_0::maximum_capacity},
           // Block type 1 is only suitable for small blocks, where the overhead
           // of block type 2 is comparatively large. Since the warmup period for
           // the change point detector is larger than the maximum desirable size
