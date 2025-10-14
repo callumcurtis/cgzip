@@ -1,5 +1,5 @@
 {
-  description = "gzip";
+  description = "cgzip";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";

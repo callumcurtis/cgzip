@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.2 FATAL_ERROR)
 
-project(gzip LANGUAGES CXX)
+project(cgzip LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 
@@ -16,5 +16,5 @@ if (ENABLE_COVERAGE)
 endif()
 
 add_subdirectory(src)
-add_subdirectory(test)
 add_subdirectory(app)
+add_subdirectory(test)

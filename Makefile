@@ -16,7 +16,7 @@ test: install data.tar data.tar.9.gz data.tar.6.gz data.tar.5.gz data.tar.1.gz
 	cmake -S . -B $(build-dir)
 	cmake --build $(build-dir) --target test
 	$(build-dir)/test/test
-	$(install-dir)/bin/gzip < data.tar > data.tar.gz
+	$(install-dir)/bin/cgzip < data.tar > data.tar.gz
 	gzip -cd data.tar.gz > data.d.tar
 	diff data.d.tar data.tar -s
 	@echo "original file size: $$(stat -c%s data.tar)"
@@ -28,7 +28,7 @@ test: install data.tar data.tar.9.gz data.tar.6.gz data.tar.5.gz data.tar.1.gz
 
 .PHONE: profile
 profile: install data.tar
-	$(install-dir)/bin/gzip < data.tar > data.tar.gz & pid=$$! && flamegraph $$pid > flamegraph.svg && kill $$pid
+	$(install-dir)/bin/cgzip < data.tar > data.tar.gz & pid=$$! && flamegraph $$pid > flamegraph.svg && kill $$pid
 
 # .PHONY: generate-coverage
 # generate-coverage:
@@ -48,7 +48,7 @@ profile: install data.tar
 .PHONY: install
 install:
 	cmake -S . -B $(build-dir) -DCMAKE_INSTALL_PREFIX=$(install-dir)
-	cmake --build $(build-dir) --target gzip
+	cmake --build $(build-dir) --target cgzip
 	cmake --install $(build-dir)
 
 # .PHONY: format

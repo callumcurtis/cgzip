@@ -1,15 +1,15 @@
-add_executable(gzip
+add_executable(cgzip
   main.cpp
 )
 
-target_include_directories(gzip
+target_include_directories(cgzip
     PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_link_libraries(gzip
+target_link_libraries(cgzip
     PRIVATE
-    gzip::gzip
+    cgzip::cgzip
 )
 
-install(TARGETS gzip DESTINATION bin)
+install(TARGETS cgzip DESTINATION bin)

@@ -1,4 +1,4 @@
-# gzip
+# cgzip
 
 ## Requirements
 
@@ -52,8 +52,8 @@ Based on the following hardware:
 The following performance results were achieved by compressing a `data.tar` file created from the `data/` folder.
 
 ```
-❯ hyperfine './install/bin/gzip < data.tar > data.tar.gz'
-Benchmark 1: ./install/bin/gzip < data.tar > data.tar.gz
+❯ hyperfine './install/bin/cgzip < data.tar > data.tar.gz'
+Benchmark 1: ./install/bin/cgzip < data.tar > data.tar.gz
   Time (mean ± σ):     35.629 s ±  1.466 s    [User: 35.280 s, System: 0.044 s]
   Range (min … max):   33.711 s … 37.568 s    10 runs
 ```
@@ -122,7 +122,7 @@ Crucially, on the `data.tar` file created from the `data/` folder, the custom co
 ```
 ❯ make test
 ...
-./install/bin/gzip < data.tar > data.tar.gz
+./install/bin/cgzip < data.tar > data.tar.gz
 gzip -cd data.tar.gz > data.d.tar
 diff data.d.tar data.tar -s
 Files data.d.tar and data.tar are identical

@@ -8,7 +8,7 @@ STANDARD_LEVEL=5
 ALL_DIFFERENCES=""
 
 while IFS= read -r filename; do
-    ./install/bin/gzip < "$filename" > validate_temp.bin
+    ./install/bin/cgzip < "$filename" > validate_temp.bin
     gzip -d < validate_temp.bin > validate_output_temp.txt
     diff -qs "$filename" validate_output_temp.txt > /dev/null
 
