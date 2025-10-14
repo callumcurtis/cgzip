@@ -1,8 +1,8 @@
 #pragma once
 
-#include "gz.hpp"
-#include "deflate.hpp"
 #include "block_type.hpp"
+#include "deflate.hpp"
+#include "gz.hpp"
 #include "size.hpp"
 
 const std::uint16_t maximum_block_type_0_capacity = (1U << 16U) - 1;
@@ -14,21 +14,21 @@ private:
   std::vector<std::uint8_t> block_;
 
 public:
-  explicit BlockType0Stream(gz::BitStream& bit_stream) : out_{bit_stream} {
+  explicit BlockType0Stream(gz::BitStream &bit_stream) : out_{bit_stream} {
     block_.reserve(Capacity);
   }
 
-  [[nodiscard]] auto bits(bool  /*is_last*/) -> std::uint64_t override {
-    return 40 + (block_.size() * size_of_in_bits<typename decltype(block_)::value_type>());
+  [[nodiscard]] auto bits(bool /*is_last*/) -> std::uint64_t override {
+    return 40 + (block_.size() *
+                 size_of_in_bits<typename decltype(block_)::value_type>());
   }
 
-  auto reset() -> void override {
-    block_.clear();
-  }
+  auto reset() -> void override { block_.clear(); }
 
   auto put(std::uint8_t byte) -> void override {
     if (block_.size() == Capacity) {
-      throw std::logic_error("Cannot extend a block of type 1 past the maximum length represented by 16 bits");
+      throw std::logic_error("Cannot extend a block of type 1 past the maximum "
+                             "length represented by 16 bits");
     }
     block_.emplace_back(byte);
   }
@@ -44,7 +44,5 @@ public:
     }
   }
 
-  [[nodiscard]] static auto capacity() -> std::size_t {
-    return Capacity;
-  }
+  [[nodiscard]] static auto capacity() -> std::size_t { return Capacity; }
 };

@@ -35,9 +35,9 @@ install:
 	cmake --build $(build-dir) --target cgzip
 	cmake --install $(build-dir)
 
-# .PHONY: format
-# format:
-# 	find include src test -type f \( -name "*.cpp" -o -name "*.hpp" \) | xargs --no-run-if-empty clang-format -i
+.PHONY: format
+format:
+	find app include src test -type f \( -name "*.cpp" -o -name "*.hpp" \) | xargs --no-run-if-empty clang-format -i
 
 # .PHONY: lint
 # lint:
