@@ -43,12 +43,8 @@ format:
 lint:
 	find app include src -type f \( -name "*.cpp" -o -name "*.hpp" \) | xargs --no-run-if-empty -n 1 -P 8 clang-tidy -fix -p $(build-dir)
 
-# .PHONY: lint-changed
-# lint-changed:
-# 	git diff --name-only --diff-filter=d HEAD | grep -E 'include/.*\.hpp$$|src/.*\.cpp$$|src/.*\.hpp$$' | xargs --no-run-if-empty -n 1 -P 8 clang-tidy -fix -p $(build-dir)
-
-# .PHONY: fix
-# fix: lint-changed format
+.PHONY: fix
+fix: lint format
 
 # .PHONY: verify
 # verify:
