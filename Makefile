@@ -60,3 +60,7 @@ setup-pre-commit:
 clean:
 	rm -rf $(build-dir) \
 		$(install-dir)
+
+.PHONY: validate
+validate:
+	./scripts/validate
