@@ -25,12 +25,12 @@ TEST_CASE("prefix codes") {
   constexpr auto codes = block_type_1_prefix_codes();
   for (auto i = 0; i < 144; ++i) {
     REQUIRE(codes.at(i).length == 8);
-    REQUIRE(codes.at(i).bits == static_cast<code_bits_t>(0b00110000 + i));
+    REQUIRE(codes.at(i).bits == static_cast<std::uint16_t>(0b00110000 + i));
   }
   for (auto i = 144; i < 256; ++i) {
     REQUIRE(codes.at(i).length == 9);
     REQUIRE(codes.at(i).bits ==
-            static_cast<code_bits_t>(0b110010000 + (i - 144)));
+            static_cast<std::uint16_t>(0b110010000 + (i - 144)));
   }
   for (auto i = 256; i < 280; ++i) {
     REQUIRE(codes.at(i).length == 7);
@@ -39,6 +39,6 @@ TEST_CASE("prefix codes") {
   for (auto i = 280; i < 288; ++i) {
     REQUIRE(codes.at(i).length == 8);
     REQUIRE(codes.at(i).bits ==
-            static_cast<code_bits_t>(0b11000000 + (i - 280)));
+            static_cast<std::uint16_t>(0b11000000 + (i - 280)));
   }
 }

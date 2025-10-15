@@ -15,6 +15,7 @@ test: install data.tar data.tar.9.gz data.tar.6.gz data.tar.5.gz data.tar.1.gz
 	cmake -S . -B $(build-dir)
 	cmake --build $(build-dir) --target test
 	$(build-dir)/test/test
+	./scripts/validate
 	$(install-dir)/bin/cgzip < data.tar > data.tar.gz
 	gzip -cd data.tar.gz > data.d.tar
 	diff data.d.tar data.tar -s
@@ -54,10 +55,6 @@ verify:
 setup-pre-commit:
 	echo "make verify" > .git/hooks/pre-commit
 	chmod +x .git/hooks/pre-commit
-
-.PHONY: validate
-validate: install
-	./scripts/validate
 
 .PHONY: clean
 clean:

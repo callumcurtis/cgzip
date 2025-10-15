@@ -9,8 +9,6 @@
 
 #include "types.hpp"
 
-using code_bits_t = std::uint16_t;
-
 template <std::size_t N>
 constexpr auto prefix_codes(std::span<const std::uint8_t, N> lengths)
     -> std::array<PrefixCode, N> {
@@ -31,12 +29,12 @@ constexpr auto prefix_codes(std::span<const std::uint8_t, N> lengths)
   }
 
   // Step 2.
-  code_bits_t code_bits = 0;
+  std::uint16_t code_bits = 0;
   count_by_length[0] = 0;
-  std::vector<code_bits_t> next_code_bits(max_length + 1);
+  std::vector<std::uint16_t> next_code_bits(max_length + 1);
   for (auto bits = 1; bits < max_length + 1; ++bits) {
-    code_bits = static_cast<code_bits_t>(code_bits + count_by_length[bits - 1])
-                << 1U;
+    code_bits =
+        static_cast<std::uint16_t>(code_bits + count_by_length[bits - 1]) << 1U;
     next_code_bits[bits] = code_bits;
   }
 
