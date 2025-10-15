@@ -40,7 +40,7 @@ private:
     return prefix_codes_with_offsets;
   }
 
-  static constexpr auto build_ll_prefix_codes()
+  static constexpr auto build_literal_length_prefix_codes()
       -> std::array<PrefixCode, num_literal_length_symbols> {
     std::array<std::uint8_t, num_literal_length_symbols> lengths{};
     // NOLINTBEGIN (cppcoreguidelines-avoid-magic-numbers)
@@ -70,7 +70,7 @@ private:
   }
 
   static constexpr std::array<PrefixCode, num_literal_length_symbols>
-      literal_length_prefix_codes_{build_ll_prefix_codes()};
+      literal_length_prefix_codes_{build_literal_length_prefix_codes()};
   static constexpr std::array<PrefixCodeWithOffset, LookAheadSize + 1>
       length_prefix_codes_with_offsets_{
           build_length_prefix_codes_with_offsets(literal_length_prefix_codes_)};

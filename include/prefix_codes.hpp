@@ -9,6 +9,7 @@
 
 #include "types.hpp"
 
+// prefix_codes generates Huffman prefix codes based on Huffman code lengths.
 template <std::size_t N>
 constexpr auto prefix_codes(std::span<const std::uint8_t, N> lengths)
     -> std::array<PrefixCode, N> {

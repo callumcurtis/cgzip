@@ -22,6 +22,7 @@ auto comparePackages(const Package<W> &a, const Package<W> &b) -> bool {
 
 } // namespace detail
 
+// package_merge generates Huffman code lengths based on symbol counts/weights.
 template <std::size_t N, typename W = std::size_t>
 auto package_merge(std::span<W, N> weights, std::uint8_t max_length)
     -> std::array<std::uint8_t, N> {

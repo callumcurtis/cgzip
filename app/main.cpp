@@ -17,6 +17,9 @@
 #include "constants.hpp"
 #include "gz.hpp"
 
+// BlockStreamWithMaximumBlockSize describes a block stream along with
+// the maximum number of uncompressed bytes that should be stored in a
+// block within its stream.
 struct BlockStreamWithMaximumBlockSize {
   std::unique_ptr<BlockStream> block_stream;
   std::size_t maximum_uncompressed_bytes_in_block;
@@ -26,6 +29,7 @@ auto main() -> int {
   // Untie stdin from stdout to avoid flushing output before each read
   std::cin.tie(nullptr);
 
+  // Track the CRC of the uncompressed data to store in the gz footer.
   auto crc_table = CRC::CRC_32().MakeTable();
   std::uint32_t crc{};
 
@@ -62,6 +66,7 @@ auto main() -> int {
                   maximum_look_back_size, maximum_look_ahead_size>>(stream),
               .maximum_uncompressed_bytes_in_block = 1U << 30U}};
 
+  // Initialize a change point detector with empirically determined parameters.
   CusumDistributionDetector change_point_detector(
       {.warmup = 1U << 13U, // NOLINT (cppcoreguidelines-avoid-magic-numbers)
        .threshold = 1e3});  // NOLINT (cppcoreguidelines-avoid-magic-numbers)
@@ -74,6 +79,7 @@ auto main() -> int {
                                })
           ->maximum_uncompressed_bytes_in_block;
 
+  // Commit the smallest compressed block from any of the block streams.
   auto commit_smallest = [&block_streams_with_maximum_block_sizes,
                           &num_uncompressed_bytes_in_block](bool is_last) {
     std::uint8_t smallest_compressed_block_type =

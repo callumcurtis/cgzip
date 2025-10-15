@@ -19,7 +19,21 @@ private:
 
   RingBuffer<std::uint8_t, LookBackSize> look_back_{};
   LookAheadRingBuffer look_ahead_{};
+  // chain_ is a ring buffer that stores the absolute position of the previous
+  // starting point of the same three-byte pattern in the look-back buffer.
+  // Together with start_absolute_by_length_three_pattern_, this forms a chain
+  // of occurrences for each three-byte pattern in the look-back buffer.
+  // Three-byte patterns are used as they are the minimum length pattern
+  // that can be represented by a backreference. Using a radix tree would be an
+  // alternative approach, but would require reading more cache lines due to its
+  // linked-list structure, as well as more complex memory management
+  // due to the large branching factor, which otherwise grows in memory quickly
+  // if 256 8-byte pointers are naively reserved in each node for possible
+  // children.
   ChainRingBuffer chain_{};
+  // start_absolute_by_length_three_pattern_ is a hash map that maps three-byte
+  // patterns to the absolute position of the most recent occurrence of the
+  // pattern in the look-back buffer.
   std::unordered_map<std::uint32_t, std::uint64_t>
       start_absolute_by_length_three_pattern_;
   BackReference back_reference_{.distance = 0, .length = 0};
@@ -92,7 +106,6 @@ private:
         create_pattern_key(look_back_[0], look_back_[1], look_back_[2]);
     auto it = start_absolute_by_length_three_pattern_.find(pattern_key);
     if (it == start_absolute_by_length_three_pattern_.end()) {
-      // TODO: remove after allowing look-ahead into next block
       return;
     }
     if (absolute_to_relative(it->second) == 0) {
@@ -102,7 +115,6 @@ private:
 
   // Find best back reference using hash map with chain
   auto find_best_back_reference() -> BackReference {
-    // TODO
     auto longest_backref = BackReference{.distance = 0, .length = 0};
 
     if (look_ahead_.size() < minimum_back_reference_length) {
