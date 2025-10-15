@@ -80,7 +80,9 @@ public:
   explicit Stream(gz::BitStream &bit_stream) : buffered_out_{bit_stream} {}
 
   [[nodiscard]] auto bits(bool /*is_last*/) -> std::uint64_t override {
-    return buffered_out_.bits();
+    return (buffered_out_.bits() +
+            3 // is last flag (1 bit), block type (2 bits)
+            + literal_length_prefix_codes_.at(eob).length);
   }
 
   auto reset() -> void override {

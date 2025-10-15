@@ -18,9 +18,11 @@
 #include "prefix_codes.hpp"
 #include "types.hpp"
 
-template <std::size_t LookBackSize = maximum_look_back_size,
-          std::size_t LookAheadSize = maximum_look_ahead_size>
-class BlockType2Stream final : public BlockStream {
+namespace block_type_2 {
+
+template <std::uint16_t LookBackSize = maximum_look_back_size,
+          std::uint16_t LookAheadSize = maximum_look_ahead_size>
+class Stream final : public BlockStream {
 private:
   deflate::BufferedBitStream buffered_out_;
   Lzss<LookBackSize, LookAheadSize> lzss_;
@@ -30,8 +32,7 @@ private:
   bool is_last_and_buffered_ = false;
 
 public:
-  explicit BlockType2Stream(gz::BitStream &bit_stream)
-      : buffered_out_{bit_stream} {}
+  explicit Stream(gz::BitStream &bit_stream) : buffered_out_{bit_stream} {}
 
   [[nodiscard]] auto bits(bool is_last) -> std::uint64_t override {
     buffer(is_last);
@@ -61,7 +62,7 @@ public:
 private:
   auto buffer(bool is_last) {
     if (buffered_out_.bits() > 0) {
-      // We have already buffered
+      // We have already buffered.
       if (is_last_and_buffered_ != is_last) {
         throw std::logic_error(
             "Cannot re-buffer with different last block flag");
@@ -71,10 +72,8 @@ private:
 
     is_last_and_buffered_ = is_last;
 
-    const auto block_type = 2;
-    const auto num_block_type_bits = 2;
     buffered_out_.push_bit(is_last ? 1 : 0);
-    buffered_out_.push_bits(block_type, num_block_type_bits);
+    buffered_out_.push_bits(2, 2);
 
     while (!lzss_.is_empty()) {
       step();
@@ -121,7 +120,7 @@ private:
     CodeLengthOffset offset;
   };
 
-  struct CodeLengthBatchSymbol {
+  struct CodeLengthSymbolBatch {
     std::uint8_t symbol;
     std::uint8_t offset_num_bits;
     std::uint16_t min;
@@ -145,9 +144,9 @@ private:
       return count;
     };
 
-    auto count_leading_prefix_codes = [](const std::uint16_t min,
-                                         const std::uint16_t max,
-                                         const std::uint16_t trailing) {
+    auto count_leading_nonzero_prefix_codes = [](const std::uint16_t min,
+                                                 const std::uint16_t max,
+                                                 const std::uint16_t trailing) {
       return std::max(min, std::uint16_t(max - trailing));
     };
 
@@ -163,13 +162,14 @@ private:
     constexpr std::uint8_t num_code_length_symbols = 19;
 
     const auto num_leading_literal_length_prefix_codes =
-        count_leading_prefix_codes(min_leading_literal_length_prefix_codes,
-                                   num_ll_symbols,
-                                   count_trailing_zero_length_prefix_codes(
-                                       literal_length_prefix_codes));
-    const auto num_leading_distance_prefix_codes = count_leading_prefix_codes(
-        min_leading_distance_prefix_codes, num_distance_symbols,
-        count_trailing_zero_length_prefix_codes(distance_prefix_codes));
+        count_leading_nonzero_prefix_codes(
+            min_leading_literal_length_prefix_codes, num_ll_symbols,
+            count_trailing_zero_length_prefix_codes(
+                literal_length_prefix_codes));
+    const auto num_leading_distance_prefix_codes =
+        count_leading_nonzero_prefix_codes(
+            min_leading_distance_prefix_codes, num_distance_symbols,
+            count_trailing_zero_length_prefix_codes(distance_prefix_codes));
 
     std::array<std::uint16_t, num_code_length_symbols>
         count_by_code_length_symbol{};
@@ -181,7 +181,7 @@ private:
     auto add_code_length_symbol_batch =
         [&prev_prefix_code_length, &num_prev_prefix_code_length, &cl_symbols,
          &count_by_code_length_symbol](
-            CodeLengthBatchSymbol code_length_batch_symbol) {
+            CodeLengthSymbolBatch code_length_batch_symbol) {
           while (num_prev_prefix_code_length >= code_length_batch_symbol.min) {
             const std::uint16_t size = std::min(code_length_batch_symbol.max,
                                                 num_prev_prefix_code_length);
@@ -208,7 +208,7 @@ private:
             return;
           }
 
-          constexpr auto zero_11_or_more_times = CodeLengthBatchSymbol{
+          constexpr auto zero_11_or_more_times = CodeLengthSymbolBatch{
               .symbol = 18, .offset_num_bits = 7, .min = 11, .max = 138};
           if (prev_prefix_code_length == 0 &&
               num_prev_prefix_code_length >= zero_11_or_more_times.min) {
@@ -216,7 +216,7 @@ private:
             return;
           }
 
-          constexpr auto zero_3_or_more_times = CodeLengthBatchSymbol{
+          constexpr auto zero_3_or_more_times = CodeLengthSymbolBatch{
               .symbol = 17, .offset_num_bits = 3, .min = 3, .max = 10};
           if (prev_prefix_code_length == 0 &&
               num_prev_prefix_code_length >= zero_3_or_more_times.min) {
@@ -224,7 +224,7 @@ private:
             return;
           }
 
-          constexpr auto previous_3_or_more_times = CodeLengthBatchSymbol{
+          constexpr auto previous_3_or_more_times = CodeLengthSymbolBatch{
               .symbol = 16, .offset_num_bits = 2, .min = 3, .max = 6};
           cl_symbols.emplace_back(prev_prefix_code_length);
           count_by_code_length_symbol.at(prev_prefix_code_length)++;
@@ -281,10 +281,10 @@ private:
             code_length_prefix_codes[14], code_length_prefix_codes[1],
             code_length_prefix_codes[15]};
     const auto num_leading_code_length_prefix_codes =
-        count_leading_prefix_codes(min_leading_code_length_prefix_codes,
-                                   num_code_length_symbols,
-                                   count_trailing_zero_length_prefix_codes(
-                                       reordered_code_length_prefix_codes));
+        count_leading_nonzero_prefix_codes(
+            min_leading_code_length_prefix_codes, num_code_length_symbols,
+            count_trailing_zero_length_prefix_codes(
+                reordered_code_length_prefix_codes));
 
     buffered_out_.push_bits(num_leading_literal_length_prefix_codes -
                                 min_leading_literal_length_prefix_codes,
@@ -319,30 +319,31 @@ private:
   }
 
   auto flush_block() {
-    const auto ll_lengths =
+    const auto literal_length_prefix_code_lengths =
         package_merge(std::span<std::size_t, num_ll_symbols>(
                           count_by_symbol_.begin(),
                           count_by_symbol_.begin() + num_ll_symbols),
                       maximum_prefix_code_length);
-    const auto distance_lengths = package_merge(
+    const auto distance_prefix_code_lengths = package_merge(
         std::span<std::size_t, num_distance_symbols>(
             count_by_symbol_.begin() + num_ll_symbols, count_by_symbol_.end()),
         maximum_prefix_code_length);
-    const auto ll_codes =
-        prefix_codes(std::span<const std::uint8_t, num_ll_symbols>(ll_lengths));
-    const auto distance_codes = prefix_codes(
-        std::span<const std::uint8_t, num_distance_symbols>(distance_lengths));
-    flush_block_metadata(ll_codes, distance_codes);
+    const auto literal_length_prefix_codes =
+        prefix_codes(std::span<const std::uint8_t, num_ll_symbols>(
+            literal_length_prefix_code_lengths));
+    const auto distance_prefix_codes =
+        prefix_codes(std::span<const std::uint8_t, num_distance_symbols>(
+            distance_prefix_code_lengths));
+    flush_block_metadata(literal_length_prefix_codes, distance_prefix_codes);
     auto it = block_.begin();
     while (it != block_.end()) {
       auto symbol = std::get<Symbol>(*it++);
       if (symbol > eob) {
-        // Is the start of a back reference
-
-        auto length_prefix_code = ll_codes.at(symbol);
+        // Is a back reference.
+        auto length_prefix_code = literal_length_prefix_codes.at(symbol);
         auto length_offset = std::get<Offset>(*it++);
         auto distance_prefix_code =
-            distance_codes.at(std::get<Symbol>(*it++) - num_ll_symbols);
+            distance_prefix_codes.at(std::get<Symbol>(*it++) - num_ll_symbols);
         auto distance_offset = std::get<Offset>(*it++);
         const auto num_back_reference_bits =
             (length_prefix_code.length + length_offset.num_bits +
@@ -352,19 +353,28 @@ private:
             {.symbol = symbol, .offset = length_offset});
         auto num_literal_bits = 0;
         for (auto literal_it = it; literal_it != it + length; ++literal_it) {
-          const auto &code = ll_codes.at(std::get<Symbol>(*literal_it));
-          if (code.length == 0) {
+          const auto &prefix_code =
+              literal_length_prefix_codes.at(std::get<Symbol>(*literal_it));
+          if (prefix_code.length == 0) {
+            // At least one literal does not have a prefix code, so we must use
+            // the back reference. Since in cases of ties we prefer the back
+            // reference, set the number of literal bits to the number of back
+            // reference bits.
             num_literal_bits = num_back_reference_bits;
             break;
           }
-          num_literal_bits += code.length;
+          num_literal_bits += prefix_code.length;
         }
         if (num_literal_bits < num_back_reference_bits) {
+          // The literals are more efficient than the back reference, so we use
+          // the literals.
           for (auto i = 0; std::cmp_less(i, length); ++i) {
             buffered_out_.push_prefix_code(
-                ll_codes.at(std::get<Symbol>(*it++)));
+                literal_length_prefix_codes.at(std::get<Symbol>(*it++)));
           }
         } else {
+          // The back reference is more efficient than the literals, so we use
+          // the back reference.
           buffered_out_.push_prefix_code(length_prefix_code);
           buffered_out_.push_offset(length_offset);
           buffered_out_.push_prefix_code(distance_prefix_code);
@@ -372,8 +382,8 @@ private:
           it += length;
         }
       } else {
-        // Is a literal
-        buffered_out_.push_prefix_code(ll_codes.at(symbol));
+        // Is a literal.
+        buffered_out_.push_prefix_code(literal_length_prefix_codes.at(symbol));
       }
     }
   }
@@ -388,3 +398,5 @@ private:
     lzss_.take_literal();
   }
 };
+
+} // namespace block_type_2

@@ -58,7 +58,7 @@ auto main() -> int {
                   maximum_look_back_size, maximum_look_ahead_size>>(stream),
               .maximum_uncompressed_bytes_in_block = 0},
           BlockStreamWithMaximumBlockSize{
-              .block_stream = std::make_unique<BlockType2Stream<
+              .block_stream = std::make_unique<block_type_2::Stream<
                   maximum_look_back_size, maximum_look_ahead_size>>(stream),
               .maximum_uncompressed_bytes_in_block = 1U << 30U}};
 

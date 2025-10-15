@@ -8,9 +8,17 @@ STANDARD_LEVEL=5
 ALL_DIFFERENCES=""
 
 while IFS= read -r filename; do
-    ./install/bin/cgzip < "$filename" > validate_temp.bin
-    gzip -d < validate_temp.bin > validate_output_temp.txt
-    diff -qs "$filename" validate_output_temp.txt > /dev/null
+    TEMP_COMPRESSED=$(mktemp)
+    TEMP_DECOMPRESSED=$(mktemp)
+
+    cleanup_iteration() {
+        rm -f "$TEMP_COMPRESSED" "$TEMP_DECOMPRESSED"
+    }
+    trap cleanup_iteration EXIT
+
+    ./install/bin/cgzip < "$filename" > "$TEMP_COMPRESSED"
+    gzip -d < "$TEMP_COMPRESSED" > "$TEMP_DECOMPRESSED"
+    diff -qs "$filename" "$TEMP_DECOMPRESSED" > /dev/null
 
     if [ "$?" -ne "0" ]
     then
@@ -18,7 +26,7 @@ while IFS= read -r filename; do
         FAILED=$(( FAILED + 1 ))
     else
         OLDSIZE=$(wc -c "$filename" | awk '{print $1}')
-        NEWSIZE=$(wc -c validate_temp.bin | awk '{print $1}')
+        NEWSIZE=$(wc -c "$TEMP_COMPRESSED" | awk '{print $1}')
         STANDARDSIZE=$(gzip -$STANDARD_LEVEL -c "$filename" | wc -c)
 
         MYRATIO=$(awk -v old="$OLDSIZE" -v new="$NEWSIZE" 'BEGIN { printf "%.2f", 100 * old / new }')
@@ -46,7 +54,7 @@ while IFS= read -r filename; do
         PASSED=$(( PASSED + 1 ))
     fi
 
-    rm validate_output_temp.txt validate_temp.bin
+    cleanup_iteration
 done < <(find ./data -type f)
 
 TOTAL=$(( PASSED + FAILED ))
