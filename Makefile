@@ -50,6 +50,7 @@ fix: lint format
 verify:
 	find app include src test -type f \( -name "*.cpp" -o -name "*.hpp" \) | xargs --no-run-if-empty clang-format --dry-run --Werror
 	git diff --name-only --diff-filter=d HEAD | grep -E 'include/.*\.hpp$$|src/.*\.cpp$$|src/.*\.hpp$$|app/.*\.cpp$$|app/.*\.hpp$$' | xargs --no-run-if-empty -n 1 -P 8 clang-tidy -p $(build-dir)
+	make clean && make test
 
 .PHONY: setup-pre-commit
 setup-pre-commit:
