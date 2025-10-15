@@ -4,7 +4,6 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <utility>
 #include <vector>
 
 #include "size.hpp"
@@ -17,70 +16,70 @@ template <std::size_t N = (1U << size_of_in_bits<std::uint8_t>())>
 class CusumDistributionDetector {
 public:
   struct CusumDistributionDetectorParams {
-    int t_warmup;
-    double h_threshold;
+    int warmup;
+    double threshold;
   };
 
   explicit CusumDistributionDetector(CusumDistributionDetectorParams params)
-      : t_warmup_(params.t_warmup), h_threshold_(params.h_threshold) {}
+      : warmup_steps_(params.warmup), threshold_(params.threshold) {}
 
   auto reset() -> void {
-    current_t_ = 0;
-    current_obs_count_ = 0;
-    cusum_statistic_ = 0.0;
+    current_step_ = 0;
+    current_counts_total_ = 0;
+    cusum_ = 0.0;
 
     std::ranges::fill(baseline_counts_, 0.0);
     std::ranges::fill(baseline_probs_, 0.0);
     std::ranges::fill(current_counts_, 0.0);
   }
 
-  auto step(int y) -> std::pair<double, bool> {
+  auto step(int y) -> bool {
     if (y < 0 || y >= N) {
-      return std::make_pair(cusum_statistic_, false);
+      return false;
     }
 
-    update_data(y);
+    update_counters(y);
 
-    if (current_t_ == t_warmup_) {
+    if (current_step_ == warmup_steps_) {
       init_params();
     }
 
-    if (current_t_ >= t_warmup_) {
-      const std::pair<double, bool> result = check_for_changepoint(y);
-      const double current_cusum = result.first;
-      const bool is_changepoint = result.second;
+    if (current_step_ >= warmup_steps_) {
+      update_cusum(y);
+
+      const bool is_changepoint = cusum_ > threshold_;
 
       if (is_changepoint) {
         reset();
       }
 
-      return std::make_pair(current_cusum, is_changepoint);
+      return is_changepoint;
     }
 
-    return std::make_pair(0.0, false);
+    return false;
   }
 
 private:
-  int t_warmup_;
-  double h_threshold_;
+  int warmup_steps_;
+  double threshold_;
 
-  int current_t_{0};
-  int current_obs_count_{0};
-  double cusum_statistic_{0.0};
+  int current_step_{0};
+  int current_counts_total_{0};
+  double cusum_{0.0};
 
   std::vector<double> baseline_counts_ = std::vector<double>(N);
   std::vector<double> baseline_probs_ = std::vector<double>(N);
 
   std::vector<double> current_counts_ = std::vector<double>(N);
 
-  auto update_data(int y) -> void {
-    current_t_++;
+  auto update_counters(int y) -> void {
+    current_step_++;
     current_counts_[y] += 1.0;
-    current_obs_count_++;
+    current_counts_total_++;
   }
 
   auto init_params() -> void {
-    if (current_obs_count_ == 0) {
+    if (current_counts_total_ == 0) {
       return;
     }
 
@@ -95,24 +94,14 @@ private:
     }
 
     std::ranges::fill(current_counts_, 0.0);
-    current_obs_count_ = 0;
+    current_counts_total_ = 0;
   }
 
-  auto check_for_changepoint(int y) -> std::pair<double, bool> {
-    const double current_sum_counts = current_obs_count_;
-
-    if (current_sum_counts == 0) {
-      return std::make_pair(0.0, false);
-    }
-
-    const double p1_y = (current_counts_[y] + 1.0) / (current_sum_counts + N);
+  auto update_cusum(int y) -> void {
+    const double p1_y =
+        (current_counts_[y] + 1.0) / (current_counts_total_ + N);
     const double p0_y = baseline_probs_[y];
     const double llr_t = std::log(p1_y) - std::log(p0_y);
-
-    cusum_statistic_ = std::max(0.0, cusum_statistic_ + llr_t);
-
-    const bool is_changepoint = cusum_statistic_ > h_threshold_;
-
-    return std::make_pair(cusum_statistic_, is_changepoint);
+    cusum_ = std::max(0.0, cusum_ + llr_t);
   }
 };

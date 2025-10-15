@@ -63,8 +63,8 @@ auto main() -> int {
               .maximum_uncompressed_bytes_in_block = 1U << 30U}};
 
   CusumDistributionDetector change_point_detector(
-      {.t_warmup = 1U << 13U, // NOLINT (cppcoreguidelines-avoid-magic-numbers)
-       .h_threshold = 1e3});  // NOLINT (cppcoreguidelines-avoid-magic-numbers)
+      {.warmup = 1U << 13U, // NOLINT (cppcoreguidelines-avoid-magic-numbers)
+       .threshold = 1e3});  // NOLINT (cppcoreguidelines-avoid-magic-numbers)
 
   const auto maximum_of_maximum_uncompressed_block_sizes =
       std::ranges::max_element(block_streams_with_maximum_block_sizes,
@@ -113,7 +113,7 @@ auto main() -> int {
         block_stream_with_maximum_block_size.block_stream->put(next_byte);
       }
       const auto is_change_point_detected =
-          change_point_detector.step(next_byte).second;
+          change_point_detector.step(next_byte);
       if (!std::cin.get(next_byte)) {
         break;
       }
