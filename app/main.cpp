@@ -54,7 +54,7 @@ auto main() -> int {
           // breakpoint to 0. This improves speed by reducing the number of LZSS
           // searches.
           BlockStreamWithMaximumBlockSize{
-              .block_stream = std::make_unique<BlockType1Stream<
+              .block_stream = std::make_unique<block_type_1::Stream<
                   maximum_look_back_size, maximum_look_ahead_size>>(stream),
               .maximum_uncompressed_bytes_in_block = 0},
           BlockStreamWithMaximumBlockSize{
