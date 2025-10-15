@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "block_type.hpp"
+#include "constants.hpp"
 #include "deflate.hpp"
 #include "gz.hpp"
 #include "lzss.hpp"
@@ -26,9 +27,9 @@ class Stream final : public BlockStream {
 private:
   deflate::BufferedBitStream buffered_out_;
   Lzss<LookBackSize, LookAheadSize> lzss_;
-  std::array<std::size_t, num_ll_symbols + num_distance_symbols>
+  std::array<std::size_t, num_literal_length_symbols + num_distance_symbols>
       count_by_symbol_{};
-  std::vector<std::variant<Symbol, Offset>> block_;
+  std::vector<std::variant<std::uint16_t, Offset>> block_;
   bool is_last_and_buffered_ = false;
 
 public:
@@ -79,12 +80,12 @@ private:
       step();
     }
 
-    push_symbol(eob);
+    push_symbol(eob_symbol);
 
     flush_block();
   }
 
-  auto push_symbol(const Symbol symbol) {
+  auto push_symbol(const std::uint16_t symbol) {
     count_by_symbol_.at(symbol)++;
     block_.emplace_back(symbol);
   }
@@ -94,12 +95,13 @@ private:
   auto push_back_reference() {
     const auto back_reference = lzss_.back_reference();
     const auto length_symbol_with_offset =
-        symbol_with_offset_from_length(back_reference.length);
+        SymbolWithOffset::from_length(back_reference.length);
     const auto distance_symbol_with_offset =
-        symbol_with_offset_from_distance(back_reference.distance);
+        SymbolWithOffset::from_distance(back_reference.distance);
     push_symbol(length_symbol_with_offset.symbol);
     push_offset(length_symbol_with_offset.offset);
-    push_symbol(distance_symbol_with_offset.symbol + num_ll_symbols);
+    push_symbol(distance_symbol_with_offset.symbol +
+                num_literal_length_symbols);
     push_offset(distance_symbol_with_offset.offset);
     // Add the literals in the back reference to the block after the back
     // reference so that we can decide between using the literals or the back
@@ -127,10 +129,11 @@ private:
     std::uint16_t max;
   };
 
-  auto flush_block_metadata(
-      const std::array<PrefixCode, num_ll_symbols> &literal_length_prefix_codes,
-      const std::array<PrefixCode, num_distance_symbols>
-          &distance_prefix_codes) {
+  auto
+  flush_block_metadata(const std::array<PrefixCode, num_literal_length_symbols>
+                           &literal_length_prefix_codes,
+                       const std::array<PrefixCode, num_distance_symbols>
+                           &distance_prefix_codes) {
 
     auto count_trailing_zero_length_prefix_codes = [](auto &prefix_codes) {
       std::uint16_t count = 0;
@@ -163,7 +166,7 @@ private:
 
     const auto num_leading_literal_length_prefix_codes =
         count_leading_nonzero_prefix_codes(
-            min_leading_literal_length_prefix_codes, num_ll_symbols,
+            min_leading_literal_length_prefix_codes, num_literal_length_symbols,
             count_trailing_zero_length_prefix_codes(
                 literal_length_prefix_codes));
     const auto num_leading_distance_prefix_codes =
@@ -319,17 +322,18 @@ private:
   }
 
   auto flush_block() {
-    const auto literal_length_prefix_code_lengths =
-        package_merge(std::span<std::size_t, num_ll_symbols>(
-                          count_by_symbol_.begin(),
-                          count_by_symbol_.begin() + num_ll_symbols),
-                      maximum_prefix_code_length);
-    const auto distance_prefix_code_lengths = package_merge(
-        std::span<std::size_t, num_distance_symbols>(
-            count_by_symbol_.begin() + num_ll_symbols, count_by_symbol_.end()),
+    const auto literal_length_prefix_code_lengths = package_merge(
+        std::span<std::size_t, num_literal_length_symbols>(
+            count_by_symbol_.begin(),
+            count_by_symbol_.begin() + num_literal_length_symbols),
         maximum_prefix_code_length);
+    const auto distance_prefix_code_lengths =
+        package_merge(std::span<std::size_t, num_distance_symbols>(
+                          count_by_symbol_.begin() + num_literal_length_symbols,
+                          count_by_symbol_.end()),
+                      maximum_prefix_code_length);
     const auto literal_length_prefix_codes =
-        prefix_codes(std::span<const std::uint8_t, num_ll_symbols>(
+        prefix_codes(std::span<const std::uint8_t, num_literal_length_symbols>(
             literal_length_prefix_code_lengths));
     const auto distance_prefix_codes =
         prefix_codes(std::span<const std::uint8_t, num_distance_symbols>(
@@ -337,24 +341,24 @@ private:
     flush_block_metadata(literal_length_prefix_codes, distance_prefix_codes);
     auto it = block_.begin();
     while (it != block_.end()) {
-      auto symbol = std::get<Symbol>(*it++);
-      if (symbol > eob) {
+      auto symbol = std::get<std::uint16_t>(*it++);
+      if (symbol > eob_symbol) {
         // Is a back reference.
         auto length_prefix_code = literal_length_prefix_codes.at(symbol);
         auto length_offset = std::get<Offset>(*it++);
-        auto distance_prefix_code =
-            distance_prefix_codes.at(std::get<Symbol>(*it++) - num_ll_symbols);
+        auto distance_prefix_code = distance_prefix_codes.at(
+            std::get<std::uint16_t>(*it++) - num_literal_length_symbols);
         auto distance_offset = std::get<Offset>(*it++);
         const auto num_back_reference_bits =
             (length_prefix_code.length + length_offset.num_bits +
              distance_prefix_code.length + distance_offset.num_bits);
 
-        const auto length = length_from_symbol_with_offset(
+        const auto length = SymbolWithOffset::to_length(
             {.symbol = symbol, .offset = length_offset});
         auto num_literal_bits = 0;
         for (auto literal_it = it; literal_it != it + length; ++literal_it) {
-          const auto &prefix_code =
-              literal_length_prefix_codes.at(std::get<Symbol>(*literal_it));
+          const auto &prefix_code = literal_length_prefix_codes.at(
+              std::get<std::uint16_t>(*literal_it));
           if (prefix_code.length == 0) {
             // At least one literal does not have a prefix code, so we must use
             // the back reference. Since in cases of ties we prefer the back
@@ -370,7 +374,7 @@ private:
           // the literals.
           for (auto i = 0; std::cmp_less(i, length); ++i) {
             buffered_out_.push_prefix_code(
-                literal_length_prefix_codes.at(std::get<Symbol>(*it++)));
+                literal_length_prefix_codes.at(std::get<std::uint16_t>(*it++)));
           }
         } else {
           // The back reference is more efficient than the literals, so we use

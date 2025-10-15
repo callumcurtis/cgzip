@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "block_type.hpp"
+#include "constants.hpp"
 #include "deflate.hpp"
 #include "gz.hpp"
 #include "lzss.hpp"
@@ -27,7 +28,7 @@ private:
     for (auto distance = minimum_back_reference_distance;
          distance <= LookBackSize; ++distance) {
       const auto &symbol_with_offset =
-          symbol_with_offset_from_distance(distance);
+          SymbolWithOffset::from_distance(distance);
       prefix_codes_with_offsets.at(distance) = PrefixCodeWithOffset{
           .prefix_code =
               PrefixCode{
@@ -40,25 +41,26 @@ private:
   }
 
   static constexpr auto build_ll_prefix_codes()
-      -> std::array<PrefixCode, num_ll_symbols> {
-    std::array<std::uint8_t, num_ll_symbols> lengths{};
+      -> std::array<PrefixCode, num_literal_length_symbols> {
+    std::array<std::uint8_t, num_literal_length_symbols> lengths{};
     // NOLINTBEGIN (cppcoreguidelines-avoid-magic-numbers)
     std::fill(lengths.begin(), lengths.begin() + 144, 8);
     std::fill(lengths.begin() + 144, lengths.begin() + 256, 9);
     std::fill(lengths.begin() + 256, lengths.begin() + 280, 7);
     std::fill(lengths.begin() + 280, lengths.end(), 8);
     // NOLINTEND (cppcoreguidelines-avoid-magic-numbers)
-    return prefix_codes<num_ll_symbols>(lengths);
+    return prefix_codes<num_literal_length_symbols>(lengths);
   }
 
   static constexpr auto build_length_prefix_codes_with_offsets(
-      const std::array<PrefixCode, num_ll_symbols> literal_length_prefix_codes)
+      const std::array<PrefixCode, num_literal_length_symbols>
+          literal_length_prefix_codes)
       -> std::array<PrefixCodeWithOffset, LookAheadSize + 1> {
     std::array<PrefixCodeWithOffset, LookAheadSize + 1>
         prefix_codes_with_offsets{};
     for (auto length = minimum_back_reference_length; length <= LookAheadSize;
          ++length) {
-      const auto &symbol_with_offset = symbol_with_offset_from_length(length);
+      const auto &symbol_with_offset = SymbolWithOffset::from_length(length);
       prefix_codes_with_offsets.at(length) =
           PrefixCodeWithOffset{.prefix_code = literal_length_prefix_codes.at(
                                    symbol_with_offset.symbol),
@@ -67,7 +69,7 @@ private:
     return prefix_codes_with_offsets;
   }
 
-  static constexpr std::array<PrefixCode, num_ll_symbols>
+  static constexpr std::array<PrefixCode, num_literal_length_symbols>
       literal_length_prefix_codes_{build_ll_prefix_codes()};
   static constexpr std::array<PrefixCodeWithOffset, LookAheadSize + 1>
       length_prefix_codes_with_offsets_{
@@ -82,7 +84,7 @@ public:
   [[nodiscard]] auto bits(bool /*is_last*/) -> std::uint64_t override {
     return (buffered_out_.bits() +
             3 // is last flag (1 bit), block type (2 bits)
-            + literal_length_prefix_codes_.at(eob).length);
+            + literal_length_prefix_codes_.at(eob_symbol).length);
   }
 
   auto reset() -> void override {
@@ -108,7 +110,8 @@ public:
       step();
     }
     buffered_out_.commit();
-    unbuffered_out.push_prefix_code(literal_length_prefix_codes_.at(eob));
+    unbuffered_out.push_prefix_code(
+        literal_length_prefix_codes_.at(eob_symbol));
   }
 
 private:

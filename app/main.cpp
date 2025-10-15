@@ -14,8 +14,8 @@
 #include "block_type_1.hpp"
 #include "block_type_2.hpp"
 #include "change_point_detection.hpp"
+#include "constants.hpp"
 #include "gz.hpp"
-#include "lzss.hpp"
 
 struct BlockStreamWithMaximumBlockSize {
   std::unique_ptr<BlockStream> block_stream;
