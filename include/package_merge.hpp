@@ -8,6 +8,8 @@
 #include <span>
 #include <vector>
 
+namespace detail {
+
 template <typename W> struct Package {
   W weight;
   std::vector<std::uint16_t> indices;
@@ -18,13 +20,15 @@ auto comparePackages(const Package<W> &a, const Package<W> &b) -> bool {
   return a.weight < b.weight;
 }
 
+} // namespace detail
+
 template <std::size_t N, typename W = std::size_t>
 auto package_merge(std::span<W, N> weights, std::uint8_t max_length)
     -> std::array<std::uint8_t, N> {
   // https://people.eng.unimelb.edu.au/ammoffat/abstracts/compsurv19moffat.pdf
   static_assert(N <= std::numeric_limits<std::uint16_t>::max());
   std::array<std::uint8_t, N> lengths{};
-  std::vector<std::vector<Package<W>>> packages_by_level(max_length);
+  std::vector<std::vector<detail::Package<W>>> packages_by_level(max_length);
   for (std::uint16_t i = 0; i < weights.size(); ++i) {
     if (weights[i] == 0) {
       continue;
@@ -36,23 +40,26 @@ auto package_merge(std::span<W, N> weights, std::uint8_t max_length)
     return lengths;
   }
   if (num_non_zero_weights == 1) {
-    // TODO: length at least 1 is required for a single weight due to
-    // serialization in block type 2; explore alternatives
+    // Length at least 1 is required for a single non-zero weight to
+    // differentiate from 0 lengths for missing weights. Otherwise,
+    // package-merge would assign a length of 0 to the single non-zero weight.
     lengths.at(packages_by_level.at(0).at(0).indices.at(0))++;
     return lengths;
   }
-  std::ranges::sort(packages_by_level.at(0), comparePackages<W>);
+  std::ranges::sort(packages_by_level.at(0), detail::comparePackages<W>);
   for (std::uint8_t level = 1; level < max_length; ++level) {
-    std::vector<Package<W>> &curr_packages = packages_by_level.at(level);
-    std::vector<Package<W>> &prev_packages = packages_by_level.at(level - 1);
+    std::vector<detail::Package<W>> &curr_packages =
+        packages_by_level.at(level);
+    std::vector<detail::Package<W>> &prev_packages =
+        packages_by_level.at(level - 1);
     for (std::uint16_t first = 0; first + 1 < prev_packages.size();
          first += 2) {
-      const Package<W> &first_package = prev_packages.at(first);
-      const Package<W> &second_package = prev_packages.at(first + 1);
-      curr_packages.emplace_back(
-          Package<W>{.weight = W(first_package.weight + second_package.weight),
-                     .indices = {}});
-      Package<W> &merged_package = curr_packages.back();
+      const detail::Package<W> &first_package = prev_packages.at(first);
+      const detail::Package<W> &second_package = prev_packages.at(first + 1);
+      curr_packages.emplace_back(detail::Package<W>{
+          .weight = W(first_package.weight + second_package.weight),
+          .indices = {}});
+      detail::Package<W> &merged_package = curr_packages.back();
       merged_package.indices.insert(merged_package.indices.end(),
                                     first_package.indices.begin(),
                                     first_package.indices.end());
@@ -62,11 +69,11 @@ auto package_merge(std::span<W, N> weights, std::uint8_t max_length)
     }
     curr_packages.insert(curr_packages.end(), packages_by_level.at(0).begin(),
                          packages_by_level.at(0).end());
-    std::ranges::sort(curr_packages, comparePackages<W>);
+    std::ranges::sort(curr_packages, detail::comparePackages<W>);
   }
-  std::vector<Package<W>> &packages_at_last_level =
+  std::vector<detail::Package<W>> &packages_at_last_level =
       packages_by_level.at(max_length - 1);
-  std::vector<std::vector<Package<W>>> solution_by_level(max_length);
+  std::vector<std::vector<detail::Package<W>>> solution_by_level(max_length);
   solution_by_level.at(max_length - 1) = {packages_at_last_level.begin(),
                                           packages_at_last_level.begin() +
                                               (2 * num_non_zero_weights) - 2};

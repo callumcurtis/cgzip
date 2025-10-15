@@ -29,7 +29,6 @@ test: install data.tar data.tar.9.gz data.tar.6.gz data.tar.5.gz data.tar.1.gz
 profile: install data.tar
 	$(install-dir)/bin/cgzip < data.tar > data.tar.gz & pid=$$! && flamegraph $$pid > flamegraph.svg && kill $$pi
 
-.PHONY: install
 install:
 	cmake -S . -B $(build-dir) -DCMAKE_INSTALL_PREFIX=$(install-dir)
 	cmake --build $(build-dir) --target cgzip
@@ -56,11 +55,11 @@ setup-pre-commit:
 	echo "make verify" > .git/hooks/pre-commit
 	chmod +x .git/hooks/pre-commit
 
+.PHONY: validate
+validate: install
+	./scripts/validate
+
 .PHONY: clean
 clean:
 	rm -rf $(build-dir) \
 		$(install-dir)
-
-.PHONY: validate
-validate:
-	./scripts/validate
