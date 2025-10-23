@@ -83,23 +83,19 @@ private:
       return;
     }
 
-    double sum_counts = 0.0;
-    for (int i = 0; i < N; ++i) {
-      baseline_counts_[i] = current_counts_[i];
-      sum_counts += baseline_counts_[i];
-    }
+    baseline_counts_.swap(current_counts_);
 
     for (int i = 0; i < N; ++i) {
-      baseline_probs_[i] = (baseline_counts_[i] + 1.0) / (sum_counts + N);
+      const auto count = baseline_counts_[i];
+      baseline_probs_[i] = count > 0 ? count / current_counts_total_ : 1.0 / N;
     }
 
-    std::ranges::fill(current_counts_, 0.0);
     current_counts_total_ = 0;
   }
 
   auto update_cusum(int y) -> void {
-    const double p1_y =
-        (current_counts_[y] + 1.0) / (current_counts_total_ + N);
+    const auto count = current_counts_[y];
+    const double p1_y = count > 0 ? count / current_counts_total_ : 1.0 / N;
     const double p0_y = baseline_probs_[y];
     const double llr_t = std::log(p1_y) - std::log(p0_y);
     cusum_ = std::max(0.0, cusum_ + llr_t);

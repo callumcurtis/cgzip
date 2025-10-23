@@ -18,7 +18,7 @@ Install the `cgzip` executable using CMake. An `install` make target is provided
 ❯ install/bin/cgzip < data/calgary_corpus/bib > bib.gz
 ```
 
-Compressed files can be decompressed using any GNU Gzip decompressor.
+Compressed files can be decompressed using any Gzip decompressor.
 
 ```console
 > gzip -cd bib.gz | diff - data/calgary_corpus/bib -s
@@ -30,9 +30,9 @@ original size = 109K bytes, compressed size = 36K bytes
 
 ## What is `cgzip` Really Doing?
 
-A high-level description of GNU Gzip is in order!
+A high-level description of Gzip is in order!
 
-GNU Gzip refers to both a file format and program. The `gzip` program understands the `.gz`
+Gzip refers to both a file format and program. The `gzip` program understands the `.gz`
 gzip file format, as well as the DEFLATE bitstream found within `.gz` files.
 The `.gz` file format is a container format. Although originally designed to support multiple
 compression formats, it was never expanded beyond a single compression format: DEFLATE.
@@ -62,7 +62,7 @@ According to the RFC, the input `AABCCDC` would have the following prefix code l
 | `D` | 1 | 3 | 111 |
 
 Although these two tricks are enough to achieve compression, a host of
-additional techniques and considerations are involved in creating a GNU Gzip compressor.
+additional techniques and considerations are involved in creating a Gzip compressor.
 For instance, DEFLATE supports three block types: block type 0, block type 1, and block type 2.
 Block type 0 is uncompressed. Block type 1 is compressed using a hardcoded table of prefix codes.
 Block type 2 is compressed using a custom table of prefix codes. The compressor chooses the sizes
@@ -81,66 +81,15 @@ As the DEFLATE specification only defines the protocol between the compressor
 and decompressor, there is significant leeway in terms of how these questions can be answered.
 The decompressor is "dumb" in the sense that it does not expect these questions to be answered in any specific way;
 it just understands how to reverse the effects of Huffman coding and LZSS.
-This allows iterative algorithmic improvements to GNU Gzip compressors without requiring changes to the
-specification or decompressors. This also means **any two implementations of a GNU Gzip compressor can achieve different
+This allows iterative algorithmic improvements to Gzip compressors without requiring changes to the
+specification or decompressors. This also means **any two implementations of a Gzip compressor can achieve different
 compression and speed, and it is up to the designer of a given compressor to address the significant number
 of design choices**.
 
-## Design Choices
-
-The following sections describe some of the design choices taken in `cgzip`
-(make sure to read [What is `cgzip` Really Doing?](#what-is-cgzip-really-doing)
-first to understand how design choices like these are required under the DEFLATE specification!).
-
-### Huffman Coding
-
-Package merge is used to generate Huffman code lengths based on symbol frequencies. See the [implementation](include/package_merge.hpp) and [reference](https://people.eng.unimelb.edu.au/ammoffat/abstracts/compsurv19moffat.pdf) for more details. Huffman code lengths are translated into prefix codes according to [RFC 1951](https://www.ietf.org/rfc/rfc1951.txt). See the [implementation](include/prefix_codes.hpp) for more details.
-
-### LZSS
-
-Ring buffers are used to represent look-ahead and look-back buffers, ensuring
-that memory overhead is upper-bounded by the maximum look-ahead and look-back
-sizes. The position of the most recent occurrence of each length-three pattern 
-is represented in a hash map. An additional ring buffer is used to represent 
-the "chain" of additional occurrences of the same pattern in the look-back 
-buffer. For example, the hash map could indicate that the pattern "ABC"
-occurred at position 100 in the look-back buffer. At the same position in the
-chain buffer, there could be an entry with the value 90, indicating that
-the pattern "ABC" previously occurred at position 90. In this fashion,
-the full set of positions for "ABC" are cached in the hash map and chain 
-buffer. See the [implementation](include/lzss.hpp) for more details.
-
-### Optimized Block Type 2 Header
-
-The block type 2 header is optimized to reduce the number of bits required
-to represent the header in the presence of trailing zero-length 
-meta-prefix-codes. See the [implementation](include/block_type_2.hpp) for more details.
-
-### Adaptive Block Sizing
-
-The block size is dynamically determined based on a CUSUM algorithm for
-change-point detection in a categorical data stream. This [article](https://sarem-seitz.com/posts/probabilistic-cusum-for-change-point-detection.html)
-gives a good overview of the algorithm for the numerical data stream case.
-To adapt the algorithm for the categorical data stream case, the probability
-of each symbol is tracked, rather than the mean of the data stream. Using
-the log-likelihood ratio, the algorithm determines whether the probability
-of the current symbol is more likely given the current distribution, rather 
-than the distribution from the warmup period. Once the cumulative sum of log-likelihood ratios
-has accumulated beyond a threshold, the distribution of the data stream is deemed to have
-shifted, and a change-point is reported. A new block is then created. See the 
-[implementation](include/change_point_detection.hpp) for more details.
-
-### Adaptive Block Type Selection
-
-The optimal block type is selected by simulating the contents of each block 
-type and comparing the number of bits. Due to the warmup period required
-for change-point detection, the minimum size of a block is 2^13 bytes.
-In practice, this is larger than desirable for a block of type 1, as
-beyond this size, the overhead of block type 2 is relatively small,
-making block type 2 preferable in essentially all cases. Since block type 1
-will never be used, it is disabled to improve speed. It can be re-enabled
-by increasing the breakpoint value for block type 1 from 0 to a value larger than 2^13
-in [main.cpp](app/main.cpp), allowing block type 1 to be considered.
+`cgzip` is fully-compliant with the DEFLATE specification and `.gz` file format, making it
+drop-in replaceable for any other Gzip compressor.
+Refer to the [Design Choices](#design-choices) section for more on how `cgzip`
+approaches the key design considerations described above.
 
 ## Benchmarks
 
@@ -256,6 +205,15 @@ Benchmark 1: ./install/bin/cgzip < data.tar > data.tar.gz
 
 The chart below compares `cgzip` and `gzip` compression ratios across all files in the `data/` folder.
 
+Differences are measured in relative percent using `gzip` as the baseline,
+meaning a compression ratio of 300% from `gzip` and a compression ratio of 290%
+from `cgzip` would translate to a -3.3% relative difference:
+
+$\text{d} = \frac{(c_\text{cgzip} - c_\text{gzip})}{c_\text{gzip}} \times 100\%$
+
+Where $d$ is the relative difference in compression ratio
+and $c_x$ represents the compression ratio of compressor $x$.
+
 ![difference in compression ratio between cgzip and gzip](./docs/compression-ratio.png)
 
 The following `gzip` version was used in the comparison (using the default compression level of 6):
@@ -271,3 +229,64 @@ There is NO WARRANTY, to the extent permitted by law.
 
 Written by Jean-loup Gailly.
 ```
+
+## Design Choices
+
+The following sections describe some of the design choices taken in `cgzip`
+(make sure to read [What is `cgzip` Really Doing?](#what-is-cgzip-really-doing)
+first to understand how design choices like these are required under the DEFLATE specification!).
+
+### Huffman Coding
+
+Package merge is used to generate Huffman code lengths based on symbol frequencies. See the [implementation](include/package_merge.hpp) and [reference](https://people.eng.unimelb.edu.au/ammoffat/abstracts/compsurv19moffat.pdf) for more details. Huffman code lengths are translated into prefix codes according to [RFC 1951](https://www.ietf.org/rfc/rfc1951.txt). See the [implementation](include/prefix_codes.hpp) for more details.
+
+### LZSS
+
+Ring buffers are used to represent look-ahead and look-back buffers, ensuring
+that memory overhead is upper-bounded by the maximum look-ahead and look-back
+sizes. The position of the most recent occurrence of each length-three pattern 
+is represented in a hash map. An additional ring buffer is used to represent 
+the "chain" of additional occurrences of the same pattern in the look-back 
+buffer. For example, the hash map could indicate that the pattern "ABC"
+occurred at position 100 in the look-back buffer. At the same position in the
+chain buffer, there could be an entry with the value 90, indicating that
+the pattern "ABC" previously occurred at position 90. In this fashion,
+the full set of positions for "ABC" are cached in the hash map and chain 
+buffer. See the [implementation](include/lzss.hpp) for more details.
+
+### Optimized Block Type 2 Header
+
+The block type 2 header is optimized to reduce the number of bits required
+to represent the header in the presence of trailing zero-length 
+meta-prefix-codes. See the [implementation](include/block_type_2.hpp) for more details.
+
+### Adaptive Block Sizing
+
+The block size is dynamically determined based on a CUSUM algorithm for
+change-point detection in a categorical data stream. This [article](https://sarem-seitz.com/posts/probabilistic-cusum-for-change-point-detection.html)
+gives a good overview of the algorithm for the numerical data stream case.
+To adapt the algorithm for the categorical data stream case, the probability
+of each symbol is tracked, rather than the mean of the data stream. Using
+the log-likelihood ratio, the algorithm determines whether the probability
+of the current symbol is more likely given the current distribution, rather 
+than the distribution from the warmup period. Once the cumulative sum of log-likelihood ratios
+has accumulated beyond a threshold, the distribution of the data stream is deemed to have
+shifted, and a change-point is reported. A new block is then created. See the 
+[implementation](include/change_point_detection.hpp) for more details.
+
+The chart below presents the impact of adaptive block sizing on `cgzip`'s compression ratios
+across all files in the `data/` folder.
+
+![difference in compression ratio between cgzip with and without adaptive block sizing](./docs/compression-ratio-with-and-without-adaptive-block-sizing.png)
+
+### Adaptive Block Type Selection
+
+The optimal block type is selected by simulating the contents of each block 
+type and comparing the number of bits. Due to the warmup period required
+for change-point detection, the minimum size of a block is 2^13 bytes.
+In practice, this is larger than desirable for a block of type 1, as
+beyond this size, the overhead of block type 2 is relatively small,
+making block type 2 preferable in essentially all cases. Since block type 1
+will never be used, it is disabled to improve speed. It can be re-enabled
+by increasing the breakpoint value for block type 1 from 0 to a value larger than 2^13
+in [main.cpp](app/main.cpp), allowing block type 1 to be considered.
